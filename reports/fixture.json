@@ -1,0 +1,124 @@
+{
+  "dataset": {
+    "domains": {
+      "airline": 2,
+      "retail": 2,
+      "telecom": 2
+    },
+    "labels": {
+      "negatives": 3,
+      "positive_rate": 0.5,
+      "positives": 3
+    },
+    "labels_by_domain": {
+      "airline": {
+        "n": 1,
+        "pos": 0
+      },
+      "retail": {
+        "n": 1,
+        "pos": 1
+      },
+      "telecom": {
+        "n": 1,
+        "pos": 0
+      }
+    },
+    "median_tools": 14,
+    "prompt_chars": {
+      "max": 26466,
+      "mean": 17283.3,
+      "median": 13728,
+      "p90": 26466,
+      "p95": 26466
+    },
+    "response_chars": {
+      "max": 528,
+      "mean": 368.8,
+      "median": 339,
+      "p90": 450,
+      "p95": 528
+    },
+    "responses_text_only": 0,
+    "responses_with_tool_calls": 6,
+    "rows": 6,
+    "with_policy_tag": 6,
+    "with_tool_catalogue": 6
+  },
+  "elapsed_sec": 0.1,
+  "file": {
+    "bytes": 112296,
+    "name": "tau2_samples.jsonl",
+    "sha256": "148170853b2595ed37fc1fd4c3f6ef356798da9fb83d6809aa2e59bb8c151253"
+  },
+  "heuristic": {
+    "accuracy": 0.8333333333333334,
+    "best_threshold": {
+      "accuracy": 0.8333333333333334,
+      "f1": 0.8,
+      "n": 6.0,
+      "positives": 3.0,
+      "precision": 1.0,
+      "recall": 0.6666666666666666,
+      "threshold": 0.46
+    },
+    "confusion": {
+      "fn": 1,
+      "fp": 0,
+      "tn": 3,
+      "tp": 2
+    },
+    "f1": 0.8,
+    "n": 6.0,
+    "positive_rate": 0.333,
+    "positives": 3.0,
+    "precision": 1.0,
+    "recall": 0.6666666666666666,
+    "rows": 6,
+    "strict_hard_only": {
+      "flagged": 2,
+      "precision": 1.0,
+      "recall": 0.667,
+      "tp": 2
+    }
+  },
+  "label": "fixture",
+  "signals": {
+    "action_targets_unrequested_entity": {
+      "coverage": 0.167,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 1,
+      "pos": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.333
+    },
+    "missing_confirmation": {
+      "coverage": 0.333,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 2,
+      "pos": 1,
+      "precision": 0.5,
+      "recall_of_positives": 0.333
+    },
+    "tool_not_available": {
+      "coverage": 0.333,
+      "hard": 2,
+      "hard_fraction": 1.0,
+      "n": 2,
+      "pos": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.667
+    },
+    "ungrounded_argument": {
+      "coverage": 0.333,
+      "hard": 2,
+      "hard_fraction": 1.0,
+      "n": 2,
+      "pos": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.667
+    }
+  }
+}
