@@ -1,33 +1,51 @@
 name: runner-check
 
-# Minimal probe: are GitHub-hosted runners available for this repository, and
-# can they reach the storage hosts the development sandbox cannot?
+# Minimal probe: are GitHub-hosted runners available for this repository, can
+# they reach the storage hosts the development sandbox cannot, and can the
+# runner commit its findings back to the branch?
 on:
   workflow_dispatch:
   push:
     paths:
       - ".github/workflows/runner-check.yml"
 
+permissions:
+  contents: write
+
 jobs:
   probe:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Environment
+      - uses: actions/checkout@v4
+        with:
+          ref: arena/ff28bb09-guardian-of-truth
+
+      - name: Environment and network
         run: |
-          set -x
-          python3 -V
-          uname -a
-          nproc
-          df -h / | tail -1
-          nvidia-smi || echo "no GPU on this runner"
-      - name: Network probe
+          mkdir -p reports
+          {
+            echo "runner: $(uname -srm), cores=$(nproc)"
+            echo "disk: $(df -h / | tail -1 | awk '{print $4}') free"
+            echo "python: $(python3 -V 2>&1)"
+            nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo "gpu: none"
+            echo "--- network ---"
+            for url in \
+              https://huggingface.co \
+              https://gv02-dsworks-obs01.obs.ru-moscow-1.hc.sbercloud.ru \
+              https://pypi.org \
+              https://github.com ; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$url" 2>/dev/null || echo ERR)
+              echo "$code $url"
+            done
+          } | tee reports/runner-check.txt
+
+      - name: Commit the probe output
         run: |
-          set -x
-          for url in \
-            https://huggingface.co \
-            https://gv02-dsworks-obs01.obs.ru-moscow-1.hc.sbercloud.ru \
-            https://pypi.org ; do
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$url" || echo "ERR")
-            echo "$code  $url"
-          done
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/runner-check.txt
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "runner-check: probe output [skip ci]"
+          git push origin "HEAD:arena/ff28bb09-guardian-of-truth"
