@@ -30,8 +30,8 @@ from .types import Event, ResponseTurn, Transcript
 @dataclass
 class EvidenceConfig:
     max_chars: int = 30_000          # ~10k tokens
-    policy_ratio: float = 0.32
-    tools_ratio: float = 0.10
+    policy_ratio: float = 0.40
+    tools_ratio: float = 0.08
     max_tool_response_chars: int = 3_500
     max_tool_call_chars: int = 700
     max_assistant_chars: int = 700
@@ -180,14 +180,19 @@ def select_tool_responses(
 
     scored: list[tuple[float, int, Event]] = []
     n = len(tool_events)
+    # Unique identifier-like tokens from the response (bounded for speed).
+    query_tokens = list(dict.fromkeys(
+        t.lower() for t in re.findall(r"[A-Za-z0-9_\-]{5,}", query)
+    ))[:200]
     for i, event in enumerate(tool_events):
         score = 2.5 * overlap_score(query, event.content)
         if i >= n - cfg.keep_last_tool_responses:
             score += 1.5
         # Identifiers from the response inside this payload are very strong.
-        for token in re.findall(r"[A-Za-z0-9_\-]{4,}", query):
-            if len(token) >= 5 and token.lower() in event.content.lower():
-                score += 0.4
+        if query_tokens:
+            content_low = event.content.lower()
+            hits = sum(1 for token in query_tokens if token in content_low)
+            score += 0.4 * min(hits, 5)
         scored.append((score, i, event))
 
     scored.sort(key=lambda x: (-x[0], -x[1]))

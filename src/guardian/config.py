@@ -29,7 +29,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "signals": SignalsConfig().__dict__,
     "judge": {
         "temperature": 0.0,
-        "max_tokens": 384,
+        "max_tokens": 448,
         "self_consistency": 1,       # 1 = greedy single pass
         "consistency_temperature": 0.4,
         "min_confidence": 0.0,        # below this the judge verdict is ignored

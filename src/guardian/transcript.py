@@ -288,11 +288,22 @@ def detect_domain(transcript: Transcript) -> str:
 
 
 def extract_policy(system_text: str) -> str:
-    """Return the ``<policy>`` section when present, otherwise the system text."""
+    """Return the ``<policy>`` section when present, otherwise the system text.
+
+    The instructions often *mention* the tag in prose ("according to the
+    <policy> provided below"), so the opening tag must start a line; otherwise
+    the match would begin inside the instructions and swallow them.
+    """
     if not system_text:
         return ""
-    m = re.search(r"<policy>(.*?)</policy>", system_text, re.IGNORECASE | re.DOTALL)
-    if m and len(m.group(1).strip()) > 50:
+    m = re.search(
+        r"(?:^|\n)[ \t]*<policy>[ \t]*\n(.*?)\n[ \t]*</policy>",
+        system_text,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not m:
+        m = re.search(r"<policy>(.*?)</policy>", system_text, re.IGNORECASE | re.DOTALL)
+    if m and len(m.group(1).strip()) >= 10:
         return m.group(1).strip()
     return system_text.strip()
 

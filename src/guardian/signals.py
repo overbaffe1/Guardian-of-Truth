@@ -73,6 +73,17 @@ ID_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ),
 ]
 _ID_ARG_RE = re.compile(r"(?:^|_)(?:id|ids|number|no|code|ref|reference)$", re.IGNORECASE)
+#: arguments that identify the *object* of an action (not payment methods,
+#: addresses or other attributes the user never has to mention)
+_TARGET_ID_KEYS = {
+    "reservation_id", "order_id", "line_id", "account_id", "customer_id",
+    "user_id", "item_id", "booking_id", "ticket_id", "subscription_id",
+    "transaction_id", "loan_id", "claim_id", "case_id", "task_id", "flight_id",
+}
+_NON_TARGET_ID_KEYS = {
+    "payment_id", "payment_method_id", "card_id", "address_id", "billing_id",
+    "shipping_id", "device_id", "session_id", "request_id", "message_id",
+}
 
 MONEY_RE = re.compile(
     r"(?:(?P<cur>\$|€|£|₽)\s?(?P<amount>\d[\d,]*(?:\.\d+)?))|"
@@ -218,10 +229,10 @@ def check_tool_availability(
         name = _normalise_tool_name(tc.name).lower()
         if name in known:
             continue
+        # Discoverable tools carry a numeric suffix (``open_bank_account_4821``);
+        # a call without it is still flagged, because the exact name matters.
         base = re.sub(r"_\d{2,6}$", "", name)
         if base in known:
-            continue
-        if any(k.startswith(name + "_") or name.startswith(k + "_") for k in known):
             continue
         signals.append(
             Signal(
@@ -304,7 +315,6 @@ def check_identifier_grounding(
                         evidence=f"{key}={value}",
                     )
                 )
-    return signals
 
     for text in _iter_response_text(response):
         for kind, value in _extract_identifiers(text):
@@ -496,7 +506,11 @@ def check_request_alignment(
         arg_ids = {
             str(value)
             for key, value in (tc.args or {}).items()
-            if isinstance(value, str) and _ID_ARG_RE.search(key) and len(value) >= 3
+            if isinstance(value, str)
+            and len(value) >= 3
+            and _ID_ARG_RE.search(key)
+            and key.lower() not in _NON_TARGET_ID_KEYS
+            and (key.lower() in _TARGET_ID_KEYS or key.lower().endswith("_id"))
         }
         if not arg_ids:
             continue

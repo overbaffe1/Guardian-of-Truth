@@ -150,3 +150,23 @@ def test_rules_can_be_disabled():
     cfg = SignalsConfig(enable_tool_availability=False)
     signals = compute_signals(t, r, specs, cfg)
     assert "tool_not_available" not in kinds(signals)
+
+
+def test_fabricated_identifier_in_text_is_hard():
+    t, r, specs = build(
+        "⟦USER⟧\nhi\n⟦ASSISTANT · ход 1⟧\nok\n",
+        "⟦ASSISTANT · ход 2⟧\nYour confirmation code is QX7ZP4, we emailed fake@example.com",
+    )
+    signals = compute_signals(t, r, specs)
+    assert "ungrounded_code" in kinds(signals, "hard")
+    assert "ungrounded_email" in kinds(signals, "hard")
+
+
+def test_identifiers_present_in_context_are_green():
+    t, r, specs = build(
+        "⟦USER⟧\nmy email is emma@example.com and reservation EHGLP3\n"
+        "⟦ASSISTANT · ход 1⟧\nok\n",
+        "⟦ASSISTANT · ход 2⟧\nWe will contact emma@example.com about EHGLP3.",
+    )
+    signals = compute_signals(t, r, specs)
+    assert not [s for s in signals if s.kind.startswith("ungrounded_")]

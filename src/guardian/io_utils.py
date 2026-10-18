@@ -18,8 +18,15 @@ _RESPONSE_ALIASES = ("response", "answer", "model_answer", "output")
 
 def _pick(row: dict[str, Any], aliases: Iterable[str], default: Any = "") -> Any:
     for key in aliases:
-        if key in row and row[key] is not None:
-            return row[key]
+        if key not in row:
+            continue
+        value = row[key]
+        if value is None:
+            continue
+        # pandas turns missing strings into NaN (a float), which is truthy.
+        if isinstance(value, float) and value != value:  # NaN
+            continue
+        return value
     return default
 
 

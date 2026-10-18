@@ -126,8 +126,14 @@ class Detector:
         for index, row in enumerate(rows):
             external_id = str(row.get("id", index))
             uid = f"{index}:{external_id}"
+            prompt_text = row.get("prompt")
+            response_raw = row.get("response")
+            if not isinstance(prompt_text, str):
+                prompt_text = "" if prompt_text is None else str(prompt_text)
+            if not isinstance(response_raw, str):
+                response_raw = "" if response_raw is None else str(response_raw)
             try:
-                item = self.prepare(uid, str(row.get("prompt") or ""), str(row.get("response") or ""))
+                item = self.prepare(uid, prompt_text, response_raw)
                 item.external_id = external_id
                 prepared.append(item)
             except Exception as exc:  # never fail the whole run on one row

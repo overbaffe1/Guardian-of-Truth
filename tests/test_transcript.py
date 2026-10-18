@@ -122,3 +122,14 @@ def test_latin_turn_marker_is_supported():
 def test_domain_detection_retail():
     prompt = "⟦SYSTEM⟧\n# Retail Agent Policy\norders and product exchanges\n⟦USER⟧\nhi\n"
     assert detect_domain(parse_transcript(prompt)) == "retail"
+
+
+def test_policy_tag_mentioned_in_prose_is_ignored():
+    system = (
+        "⟦SYSTEM⟧\n<instructions>\nYou are an agent. Follow the <policy> provided below.\n"
+        "</instructions>\n<policy>\n# Real Policy\n\nDo not refund insurance.\n</policy>\n"
+        "[AVAILABLE TOOLS]\n- a_tool: x\n"
+    )
+    policy = extract_policy(parse_transcript(system).system_text)
+    assert policy.startswith("# Real Policy")
+    assert "Follow the" not in policy

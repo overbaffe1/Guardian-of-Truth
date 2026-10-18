@@ -175,12 +175,17 @@ def heuristic_verdict(signals: list[Signal], response_empty: bool = False) -> Ju
             votes=[1],
         )
     score = sum(SOFT_WEIGHTS.get(s.kind, 0.3) for s in signals if s.severity == "soft")
-    p1 = 1.0 / (1.0 + math.exp(-(score - 1.1) * 1.8))
+    # 0.8 was tuned on the synthetic tau2-based development set: it keeps
+    # precision high while recovering single strong hints (e.g. an invented
+    # monetary amount).
+    p1 = 1.0 / (1.0 + math.exp(-(score - 0.8) * 1.8))
     label = 1 if p1 >= 0.5 else 0
     reason = "; ".join(s.kind for s in signals[:4]) or "no suspicious signals"
+    # ``confidence`` is the confidence in the predicted label, matching the
+    # convention used for the LLM verdicts.
     return JudgeResult(
         label=label,
-        confidence=abs(p1 - 0.5) * 2 if label == 1 else 1 - p1,
+        confidence=p1 if label == 1 else 1.0 - p1,
         hallucination_type="unsupported" if label else "none",
         reason=reason,
         votes=[label],

@@ -38,15 +38,29 @@ A claim or action in the RESPONSE that is not justified by the CONTEXT:
 - correct restatement, aggregation, filtering, sorting of data from the context;
 - rounding, reformatting, translation, or paraphrasing that does not change the meaning;
 - wording, style, tone, typos, extra politeness, or a different but equivalent formulation;
-- internal reasoning or secondary output fields that never reach the user and do not change
-  the result;
+- internal reasoning / scratchpad text inside the response when the final answer or action
+  is correct: judge the result, not the wording of the reasoning (the exemption is lost if
+  the result itself is wrong);
+- secondary output fields that never reach the user and do not change the result, as long
+  as the controlling flag / final action is correct;
 - asking the user for clarification or confirmation, or waiting for confirmation;
 - omitting information (unless the policy requires it), being terse, or being unhelpful.
 
 # DECISION TEST
 Ask: "Would this detail or action change the outcome, or the data the user sees?"
 If yes, or potentially yes -> label 1. If it is clearly cosmetic and can never change
-the outcome -> label 0. Do not flag generic helpful phrasing without specific facts.
+the outcome -> label 0.
+
+# PRECISION RULES (avoid false alarms)
+- Generic helpful phrasing without specific facts ("I can help with that", "Let me check",
+  "Thanks for waiting") is NOT a hallucination.
+- A question to the user, a confirmation request, or an acknowledgement is NOT a hallucination.
+- A paraphrase of a tool result with the same meaning is NOT a hallucination, even if the
+  wording, order or formatting differ.
+- Only check the rules of the policy that are relevant to this action; unrelated sections
+  must not be used to condemn the response.
+- If the only problem is that the response is incomplete, terse, or stylistically poor,
+  label 0.
 
 # HOW TO WORK
 1. Read the POLICY and the prior dialogue. Note the facts that matter: entities, ids,
@@ -56,7 +70,7 @@ the outcome -> label 0. Do not flag generic helpful phrasing without specific fa
    A detail is grounded only if it is present in the context or directly computable from it.
 4. Compare numbers, ids and statuses character by character. Check tool names and arguments
    against [AVAILABLE TOOLS].
-5. Apply the decision test and output the verdict.
+5. Apply the decision test and the precision rules above, then output the verdict.
 
 # CALIBRATION NOTES
 - The policy overrides the agent's own statements about the policy.
@@ -99,6 +113,9 @@ USER_TEMPLATE = """[CONTEXT]
 </response_under_audit>
 
 [AUTOMATED PRE-CHECKS]
+These are heuristic hints from a deterministic checker. They may be incomplete or wrong;
+verify every hint against the context yourself, and ignore hints that are explained by
+legitimate paraphrasing, rounding or aggregation.
 {hints}
 
 Audit the response now. Return only the JSON object."""

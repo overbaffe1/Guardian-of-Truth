@@ -78,10 +78,8 @@ def fuse(
         label = 1
         p1 = max(p1, min(0.99, 1.0 / (1.0 + math.exp(-(_soft_score(signals) - 1.0)))))
 
-    if hard and cfg.rule_mode != "strict":
-        # In hint mode hard signals only nudge the score.
-        p1 = max(p1, 0.75)
-        label = 1 if p1 >= cfg.threshold else 0
+    # In "hint" mode hard signals are only passed to the judge; they do not
+    # override its verdict here.
 
     return Prediction(
         id=uid,
