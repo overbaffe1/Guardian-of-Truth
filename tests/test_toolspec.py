@@ -103,3 +103,80 @@ def test_spec_source_tracks_parser():
     text_specs = extract_available_tools(TEXT_SYSTEM)
     assert json_specs["get_user_details"].source == "json"
     assert text_specs["search_knowledge_base"].source == "text"
+
+
+OFFICIAL_SYSTEM = """⟦SYSTEM⟧
+You are an airline agent.
+<policy>
+Current time is 2024-05-15 15:00:00 EST.
+</policy>
+
+[AVAILABLE TOOLS]
+- book_reservation — Book a reservation for a customer
+    origin: string! — The origin airport code
+    destination: string!
+    flights: array! — The list of flights
+        · flight_number: string!
+        · date: string!
+        · price: integer!
+    payment_methods: array!
+        · payment_id: string!
+        · amount: integer!
+    cabin: string! [enum: basic_economy|economy|business] — Cabin class
+    insurance: string [enum: yes|no]
+- get_user_details — Get the details of a user
+    user_id: string!
+"""
+
+
+def test_official_catalogue_is_parsed():
+    specs = extract_available_tools(OFFICIAL_SYSTEM)
+    assert set(specs) == {"book_reservation", "get_user_details"}
+    book = specs["book_reservation"]
+    assert book.source == "text-official"
+    assert set(book.params) == {
+        "origin", "destination", "flights", "payment_methods", "cabin", "insurance",
+    }
+    assert book.params["origin"].required is True
+    assert book.params["insurance"].required is False
+    assert book.params["insurance"].enum == ["yes", "no"]
+    assert book.params["cabin"].enum == ["basic_economy", "economy", "business"]
+    # nested fields are attached to their parent, not treated as top-level
+    assert set(book.params["flights"].children) == {"flight_number", "date", "price"}
+    assert book.params["flights"].children["price"].type == "integer"
+
+
+def test_official_schema_validation():
+    specs = extract_available_tools(OFFICIAL_SYSTEM)
+    book = specs["book_reservation"]
+    good = {
+        "origin": "JFK",
+        "destination": "SFO",
+        "flights": [{"flight_number": "HAT023", "date": "2024-05-26", "price": 120}],
+        "payment_methods": [{"payment_id": "credit_card_1", "amount": 120}],
+        "cabin": "business",
+    }
+    assert validate_tool_call(book, good) == []
+
+    missing = dict(good)
+    missing.pop("origin")
+    assert any("origin" in issue for issue in validate_tool_call(book, missing))
+
+    bad_enum = dict(good, cabin="first")
+    assert any("cabin" in issue for issue in validate_tool_call(book, bad_enum))
+
+    invented = dict(good, payment_methods=[{"id": "c1", "source": "certificate"}])
+    issues = validate_tool_call(book, invented)
+    assert any("payment_id" in issue for issue in issues)
+    assert any("amount" in issue for issue in issues)
+
+
+def test_official_signature_rendering():
+    from guardian.toolspec import render_signature
+
+    specs = extract_available_tools(OFFICIAL_SYSTEM)
+    text = render_signature(specs["book_reservation"])
+    assert text.startswith("book_reservation(")
+    assert "origin: string!" in text
+    assert "cabin: string![basic_economy|economy|business]" in text
+    assert "payment_id: string!" in text

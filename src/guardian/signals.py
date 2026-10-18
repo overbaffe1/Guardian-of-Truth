@@ -306,7 +306,10 @@ def check_tool_arguments(
             continue
         # Argument checks are only authoritative for real JSON schemas; a
         # best-effort text parse may mislabel optional fields as required.
-        severity = "hard" if getattr(spec, "source", "text") == "json" else "soft"
+        source = getattr(spec, "source", "text")
+        # JSON schemas and the official text rendering both carry exact
+        # required/enum markers; the legacy heuristics do not.
+        severity = "hard" if source in ("json", "text-official") else "soft"
         for issue in validate_tool_call(spec, tc.args):
             signals.append(
                 Signal(

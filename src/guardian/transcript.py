@@ -34,12 +34,16 @@ TOOL_CALL_RE = re.compile(
 TOOL_CALL_BARE_RE = re.compile(
     rf"^\s*TOOL[_ ]?CALL\s*:?\s*`?({_NAME})`?\s*:?\s*(.*)$", re.IGNORECASE
 )
+# The official renderer marks environment failures as ``name [ERROR]:``.
 TOOL_RESP_RE = re.compile(
-    rf"^\s*{_ARROW_LEFT}\s*TOOL[_ ]?RESPO?N?S?E?\s*:?\s*`?({_NAME})`?\s*:?\s*(.*)$",
+    rf"^\s*{_ARROW_LEFT}\s*TOOL[_ ]?RESPO?N?S?E?\s*:?\s*`?({_NAME})`?\s*"
+    r"(\[\s*ERROR\s*\])?\s*:?\s*(.*)$",
     re.IGNORECASE,
 )
 TOOL_RESP_BARE_RE = re.compile(
-    rf"^\s*TOOL[_ ]?RESPO?N?S?E?\s*:?\s*`?({_NAME})`?\s*:?\s*(.*)$", re.IGNORECASE
+    rf"^\s*TOOL[_ ]?RESPO?N?S?E?\s*:?\s*`?({_NAME})`?\s*"
+    r"(\[\s*ERROR\s*\])?\s*:?\s*(.*)$",
+    re.IGNORECASE,
 )
 
 _TURN_RE = re.compile(r"(?:ход|turn|step)\s*(\d+)", re.IGNORECASE)
@@ -125,8 +129,8 @@ def _consume_indented_block(lines: list[str], start: int, first: str, indent: in
     return text, j
 
 
-def _match_tool_line(line: str) -> Optional[tuple[str, str, str]]:
-    """Return ``(kind, name, rest)`` when the line is a tool call/response."""
+def _match_tool_line(line: str) -> Optional[tuple[str, str, str, bool]]:
+    """Return ``(kind, name, rest, error)`` when the line is a tool call/response."""
     for regex, kind in (
         (TOOL_CALL_RE, "tool_call"),
         (TOOL_CALL_BARE_RE, "tool_call"),
@@ -136,16 +140,24 @@ def _match_tool_line(line: str) -> Optional[tuple[str, str, str]]:
         m = regex.match(line)
         if m:
             name = m.group(1)
-            rest = m.group(2) or ""
+            rest = (m.group(3) if kind == "tool_response" else m.group(2)) or ""
+            error = kind == "tool_response" and bool(m.group(2))
+            if error is False and kind == "tool_response" and rest.lstrip().lower().startswith("[error]"):
+                error = True
+                rest = rest.lstrip()[len("[error]") :].lstrip(" :")
             # ``TOOL_CALL: {...}`` without a name is not a valid tool line.
             if not name or name.upper() in {"CALL", "RESPONSE", "TOOL"}:
                 continue
-            return kind, name, rest
+            return kind, name, rest, error
     return None
 
 
 def _append_assistant_segment(
-    events: list[Event], content: str, turn: Optional[int], order_start: int
+    events: list[Event],
+    content: str,
+    turn: Optional[int],
+    order_start: int,
+    caller: str = "assistant",
 ) -> int:
     lines = content.split("\n")
     buffer: list[str] = []
@@ -155,7 +167,8 @@ def _append_assistant_segment(
         nonlocal buffer, order
         text = "\n".join(buffer).strip()
         if text:
-            events.append(Event(kind="assistant", content=text, turn=turn, order=order))
+            kind = "user" if caller == "user" else "assistant"
+            events.append(Event(kind=kind, content=text, turn=turn, order=order))
             order += 1
         buffer = []
 
@@ -169,7 +182,7 @@ def _append_assistant_segment(
             continue
 
         flush_text()
-        kind, name, rest = matched
+        kind, name, rest, error = matched
         indent = len(line) - len(line.lstrip())
         if kind == "tool_call":
             args_text, nxt = _consume_json_block(lines, i, rest)
@@ -185,6 +198,7 @@ def _append_assistant_segment(
                         args=args if isinstance(args, dict) else None,
                         parse_ok=bool(ok and isinstance(args, dict)),
                         raw_line=line.strip(),
+                        caller=caller,
                     ),
                 )
             )
@@ -201,6 +215,7 @@ def _append_assistant_segment(
                     tool_name=name,
                     turn=turn,
                     order=order,
+                    error=error,
                 )
             )
             order += 1
@@ -232,6 +247,8 @@ def parse_transcript(text: str) -> Transcript:
                 content = raw[m.end() : content_end]
                 if role in ("assistant", "other"):
                     order = _append_assistant_segment(events, content, None, order)
+                elif role == "user":
+                    order = _append_assistant_segment(events, content, None, order, caller="user")
                 elif content.strip():
                     events.append(Event(kind=role, content=content.strip(), order=order))
                     order += 1
@@ -256,8 +273,12 @@ def parse_transcript(text: str) -> Transcript:
             content_start = m.end()
             content_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(raw)
             content = raw[content_start:content_end]
-            if role == "assistant" or role == "other":
+            if role in ("assistant", "other"):
                 order = _append_assistant_segment(events, content, turn, order)
+            elif role == "user":
+                # Customers may call tools too (telecom); keep their calls and
+                # results as first-class events instead of burying them in text.
+                order = _append_assistant_segment(events, content, turn, order, caller="user")
             else:
                 content = content.strip()
                 if content:

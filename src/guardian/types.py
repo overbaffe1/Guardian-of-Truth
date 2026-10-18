@@ -20,6 +20,8 @@ class ToolCall:
     #: tool names may be decorated by the transcript renderer, e.g. ``name``
     #: surrounded by backticks.  The clean name is stored in ``name``.
     raw_line: str = ""
+    #: who issued the call: "assistant" (the agent) or "user" (customer tools)
+    caller: str = "assistant"
 
     def args_preview(self, limit: int = 600) -> str:
         if self.parse_ok and self.args is not None:
@@ -41,6 +43,8 @@ class Event:
     tool_call: Optional[ToolCall] = None
     tool_name: Optional[str] = None  # for tool_response
     order: int = 0
+    #: the environment marked the tool result as failed (``← TOOL_RESPONSE x [ERROR]:``)
+    error: bool = False
 
     def short(self, limit: int = 400) -> str:
         text = self.content if self.kind != "tool_call" else (

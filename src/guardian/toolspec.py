@@ -32,6 +32,8 @@ class ParamSpec:
     required: bool = True
     enum: list[str] = field(default_factory=list)
     description: str = ""
+    #: fields of a nested object / array of objects (official ``·`` lines)
+    children: dict[str, "ParamSpec"] = field(default_factory=dict)
 
 
 @dataclass
@@ -178,6 +180,97 @@ def _parse_json_catalogue(block: str) -> dict[str, ToolSpec]:
     return specs
 
 
+# Official renderer (verified against the competition data):
+#   - book_reservation — Book a reservation
+#       origin: string! — The origin airport
+#       flights: array!
+#           · flight_number: string!
+#       cabin: string! [enum: basic_economy|economy|business]
+_OFFICIAL_TOOL_RE = re.compile(r"^-\s+([A-Za-z_][\w.\-]{1,64})\s+[—–]\s*(.*)$")
+_OFFICIAL_PARAM_RE = re.compile(
+    r"^(?P<indent>[ \t]*)(?:·\s*)?(?P<name>[A-Za-z_][\w\-]*)\s*:\s*"
+    r"(?P<type>[A-Za-z_][A-Za-z0-9_\[\]]*)"
+    r"(?P<req>!?)"
+    r"(?:\s*\[enum:\s*(?P<enum>[^\]]*)\])?"
+    r"(?:\s*[—–-]\s*(?P<desc>.*))?$"
+)
+_JSON_TYPES = {"string", "integer", "number", "boolean", "array", "object"}
+
+
+def _render_param(param: ParamSpec) -> str:
+    text = f"{param.name}: {param.type}{'!' if param.required else ''}"
+    if param.enum:
+        text += "[" + "|".join(param.enum) + "]"
+    if param.children:
+        text += "{" + ", ".join(_render_param(c) for c in param.children.values()) + "}"
+    return text
+
+
+def render_signature(spec: ToolSpec, max_chars: int = 600) -> str:
+    """One-line schema of a tool, e.g. ``book_reservation(origin: string!, ...)``."""
+    args = ", ".join(_render_param(p) for p in spec.params.values())
+    text = f"{spec.name}({args})"
+    if len(text) > max_chars:
+        text = text[: max_chars - 1] + "…"
+    return text
+
+
+def _parse_official_catalogue(block: str) -> dict[str, ToolSpec]:
+    specs: dict[str, ToolSpec] = {}
+    current: Optional[ToolSpec] = None
+    param_indent: Optional[int] = None
+    last_top: Optional[ParamSpec] = None
+    for line in block.split("\n"):
+        if not line.strip():
+            continue
+        header = _OFFICIAL_TOOL_RE.match(line)
+        if header:
+            name = header.group(1)
+            if name.lower() in _NOT_TOOLS:
+                current = None
+                continue
+            current = ToolSpec(
+                name=name,
+                description=header.group(2).strip()[:400],
+                source="text-official",
+            )
+            specs[name] = current
+            param_indent = None
+            last_top = None
+            continue
+        if current is None:
+            continue
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            current = None
+            continue
+        match = _OFFICIAL_PARAM_RE.match(line)
+        if not match:
+            continue
+        ptype = match.group("type").lower()
+        if ptype not in _JSON_TYPES:
+            continue
+        indent = len(line) - len(line.lstrip())
+        nested = stripped.startswith("·") or (param_indent is not None and indent > param_indent)
+        param = ParamSpec(
+            name=match.group("name"),
+            type=ptype,
+            required=bool(match.group("req")),
+            enum=[v.strip() for v in (match.group("enum") or "").split("|") if v.strip()],
+            description=(match.group("desc") or "")[:200],
+        )
+        if param.name.lower() in _NOT_TOOLS:
+            continue
+        if nested:
+            if last_top is not None:
+                last_top.children[param.name] = param
+            continue
+        param_indent = indent
+        last_top = param
+        current.params[param.name] = param
+    return specs
+
+
 def _parse_text_catalogue(block: str) -> dict[str, ToolSpec]:
     specs: dict[str, ToolSpec] = {}
     lines = block.split("\n")
@@ -267,9 +360,12 @@ def extract_available_tools(system_text: str) -> dict[str, ToolSpec]:
     if not block:
         return {}
     specs = _parse_json_catalogue(block)
+    # The official text rendering carries precise required/enum markers.
+    for name, spec in _parse_official_catalogue(block).items():
+        if name not in specs or len(spec.params) > len(specs[name].params):
+            specs[name] = spec
     if len(specs) < 2:
-        text_specs = _parse_text_catalogue(block)
-        for name, spec in text_specs.items():
+        for name, spec in _parse_text_catalogue(block).items():
             if name not in specs or len(spec.params) > len(specs[name].params):
                 specs[name] = spec
     return specs
@@ -284,11 +380,14 @@ def catalogue_text(
     max_tools: int = 90,
     max_desc: int = 90,
     max_chars: int | None = None,
+    focus: Optional[set[str]] = None,
 ) -> str:
     """Compact tool catalogue: *all* names first, then descriptions.
 
     Names are the critical part (tool availability), so they are never dropped
-    in favour of descriptions when the budget is tight.
+    in favour of descriptions when the budget is tight.  Tools listed in
+    ``focus`` (those called or mentioned in the audited turn) additionally get
+    their argument schema, which lets the judge verify arguments itself.
     """
     if not specs:
         return "(tool catalogue not found in the context)"
@@ -299,6 +398,17 @@ def catalogue_text(
 
     lines = [header]
     used = len(header) + 1
+    lower = {name.lower(): name for name in specs}
+    for wanted in sorted(focus or ()):
+        name = lower.get(str(wanted).lower())
+        if not name:
+            continue
+        signature = "- " + render_signature(specs[name])
+        if max_chars is not None and used + len(signature) + 1 > max_chars:
+            break
+        lines.append(signature)
+        used += len(signature) + 1
+
     for _, spec in sorted(specs.items())[:max_tools]:
         line = spec.brief(max_desc)
         if max_chars is not None and used + len(line) + 1 > max_chars:
@@ -366,6 +476,23 @@ def validate_tool_call(spec: ToolSpec, args: Optional[dict[str, Any]]) -> list[s
                 issues.append(
                     f"argument '{pname}' value {value!r} is not one of {pspec.enum}"
                 )
+        if pspec.children:
+            items = value if isinstance(value, list) else [value]
+            for index, item in enumerate(items[:10]):
+                if not isinstance(item, dict):
+                    continue
+                for child_name, child in pspec.children.items():
+                    if child.required and child_name not in item:
+                        issues.append(
+                            f"missing required argument '{pname}[{index}].{child_name}'"
+                        )
+                    elif child_name in item and child.enum:
+                        norm = {str(x).strip().lower() for x in child.enum}
+                        if str(item[child_name]).strip().lower() not in norm:
+                            issues.append(
+                                f"argument '{pname}[{index}].{child_name}' value "
+                                f"{item[child_name]!r} is not one of {child.enum}"
+                            )
     return issues
 
 

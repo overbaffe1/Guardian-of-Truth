@@ -247,7 +247,19 @@ def build_evidence(
 
     # -- 2. tool catalogue ---------------------------------------------------
     tools_budget = int(total_budget * cfg.tools_ratio)
-    tools_text = catalogue_text(specs, max_desc=110, max_chars=tools_budget)
+    # The audited turn's own tools get their argument schema included, so the
+    # judge can check required fields/enums instead of guessing the API.
+    focus = {tc.name for tc in response.tool_calls if tc.name}
+    if response.text:
+        low_text = response.text.lower()
+        for name in specs:
+            if len(focus) >= 4:
+                break
+            if name.lower() in low_text:
+                focus.add(name)
+    tools_text = catalogue_text(
+        specs, max_desc=110, max_chars=tools_budget, focus=focus or None
+    )
     if not specs:
         # The catalogue could not be parsed: keep the raw block so the judge
         # can still check which tools exist.
