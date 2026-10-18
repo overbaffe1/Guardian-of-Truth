@@ -88,19 +88,23 @@ jobs:
           FREE_MB=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
           MODEL_GB=$(( MODEL_MB / 1024 + 1 ))
           FREE_GB=$(( FREE_MB / 1024 ))
-          echo "model_mb=$MODEL_MB" >> "$GITHUB_OUTPUT"
+          # The zip needs room for the model plus a second copy of it.
+          if [ $(( MODEL_GB + 4 )) -gt "$FREE_GB" ]; then LOW=true; else LOW=false; fi
           echo "model_gb=$MODEL_GB" >> "$GITHUB_OUTPUT"
           echo "free_after=$FREE_GB" >> "$GITHUB_OUTPUT"
+          echo "low_disk=$LOW" >> "$GITHUB_OUTPUT"
           echo "model=${MODEL_MB} MB, free after download=${FREE_GB} GB"
           ls model
           du -sh model
 
       - name: Publish the weights directly (low-disk fallback)
+        id: weights_only
         # Building submission.zip needs room for the model *and* a second copy
         # of it inside the archive. When that does not fit, ship the weights as
         # release assets and let the participant build the archive locally,
         # which needs no extra disk.
         id: weights_only
+        if: ${{ steps.dl.outputs.low_disk == 'true' }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -136,7 +140,7 @@ jobs:
           PY
 
       - name: Build archive
-        id: verify
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           python scripts/make_submission.py --model model --out submission.zip
@@ -144,7 +148,7 @@ jobs:
           rm -rf model
 
       - name: Verify archive
-        id: verify
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           unzip -t submission.zip | tail -2
@@ -162,6 +166,7 @@ jobs:
           unzip -l submission.zip | head -20
 
       - name: Smoke test the entrypoint
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
@@ -182,7 +187,7 @@ jobs:
           PY
 
       - name: Split and publish to a Release
-        if: ${{ steps.verify.outcome == 'success' }}
+        if: ${{ steps.weights_only.outcome != 'success' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
