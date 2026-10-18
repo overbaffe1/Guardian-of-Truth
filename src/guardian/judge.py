@@ -20,21 +20,34 @@ _TYPE_RE = re.compile(r'"?hallucination_type"?\s*[:=]\s*"([a-z_]+)"', re.IGNOREC
 _REASON_RE = re.compile(r'"?reason"?\s*[:=]\s*"((?:[^"\\]|\\.){0,400})"', re.IGNORECASE)
 
 
+_VERDICT_KEYS = ("label", "verdict", "is_hallucination", "hallucination", "result")
+
+
 def _extract_json_object(text: str) -> Optional[dict[str, Any]]:
+    """Return the most relevant JSON object from a model reply.
+
+    Models sometimes emit reasoning with braces before the verdict, so objects
+    that actually contain a verdict key are preferred (the last one wins).
+    """
     if not text:
         return None
     cleaned = text.strip()
     cleaned = re.sub(r"^```(?:json)?", "", cleaned).strip()
     cleaned = re.sub(r"```$", "", cleaned).strip()
     decoder = json.JSONDecoder()
+    candidates: list[dict[str, Any]] = []
     for match in re.finditer(r"\{", cleaned):
         try:
             value, _ = decoder.raw_decode(cleaned[match.start() :])
-            if isinstance(value, dict):
-                return value
         except Exception:
             continue
-    return None
+        if not isinstance(value, dict):
+            continue
+        if any(key in value for key in _VERDICT_KEYS):
+            candidates.append(value)
+        elif not candidates:
+            candidates.append(value)
+    return candidates[-1] if candidates else None
 
 
 def _coerce_label(value: Any) -> Optional[int]:
@@ -151,6 +164,7 @@ SOFT_WEIGHTS = {
     "possible_false_refusal": 0.6,
     "claimed_action_without_tool_call": 0.7,
     "action_targets_unrequested_entity": 0.8,
+    "claimed_success_after_tool_error": 0.9,
     "duplicate_tool_call": 0.2,
     "unparseable_arguments": 0.2,
 }

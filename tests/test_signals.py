@@ -170,3 +170,38 @@ def test_identifiers_present_in_context_are_green():
     )
     signals = compute_signals(t, r, specs)
     assert not [s for s in signals if s.kind.startswith("ungrounded_")]
+
+
+def test_success_claim_after_tool_error():
+    t, r, specs = build(
+        "⟦USER⟧\ncancel EHGLP3\n⟦ASSISTANT · ход 1⟧\n"
+        '\t→ TOOL_CALL cancel_reservation: {"reservation_id": "EHGLP3"}\n'
+        '\t← TOOL_RESPONSE cancel_reservation: {"error": true, "message": "Reservation not found"}\n',
+        "⟦ASSISTANT · ход 2⟧\nI have successfully cancelled your reservation.",
+    )
+    signals = compute_signals(t, r, specs)
+    assert "claimed_success_after_tool_error" in kinds(signals, "soft")
+
+
+def test_success_claim_with_ok_tool_is_fine():
+    t, r, specs = build(
+        "⟦USER⟧\ncancel EHGLP3\n⟦ASSISTANT · ход 1⟧\n"
+        '\t→ TOOL_CALL cancel_reservation: {"reservation_id": "EHGLP3"}\n'
+        '\t← TOOL_RESPONSE cancel_reservation: {"reservation_id": "EHGLP3", "status": "cancelled"}\n',
+        "⟦ASSISTANT · ход 2⟧\nI have successfully cancelled your reservation.",
+    )
+    signals = compute_signals(t, r, specs)
+    assert "claimed_success_after_tool_error" not in kinds(signals)
+
+
+def test_success_claim_after_recovered_error_is_fine():
+    t, r, specs = build(
+        "⟦USER⟧\ncancel EHGLP3\n⟦ASSISTANT · ход 1⟧\n"
+        '\t→ TOOL_CALL cancel_reservation: {"reservation_id": "EHGLP3"}\n'
+        '\t← TOOL_RESPONSE cancel_reservation: {"error": true, "message": "Not found"}\n'
+        '\t→ TOOL_CALL cancel_reservation: {"reservation_id": "EHGLP3"}\n'
+        '\t← TOOL_RESPONSE cancel_reservation: {"status": "cancelled"}\n',
+        "⟦ASSISTANT · ход 2⟧\nYour reservation has been successfully cancelled.",
+    )
+    signals = compute_signals(t, r, specs)
+    assert "claimed_success_after_tool_error" not in kinds(signals)

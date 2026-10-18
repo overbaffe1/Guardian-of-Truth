@@ -35,7 +35,8 @@
     "enable_duplicate_check": true,
     "enable_action_claim_check": true,
     "enable_request_alignment": true,
-    "max_soft_hints": 12
+    "max_soft_hints": 12,
+    "enable_success_after_failure": true
   },
   "judge": {
     "temperature": 0.0,

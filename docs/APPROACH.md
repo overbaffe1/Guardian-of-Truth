@@ -94,6 +94,7 @@ prompt/response
 | `possible_false_refusal` | soft | отказ/«нет доступа» при наличии инструментов и политики, которые могут разрешать запрос |
 | `claimed_action_without_tool_call` | soft | «я отменил/оформил/отправил», но в ходе нет вызова инструмента |
 | `action_targets_unrequested_entity` | soft | действие меняет сущность, которую пользователь не упоминал |
+| `claimed_success_after_tool_error` | soft | «успешно отменил», хотя последний tool-ответ содержит ошибку |
 | `duplicate_tool_call` | soft | повтор предыдущего вызова с теми же аргументами |
 | `unparseable_arguments` | soft | JSON аргументов не парсится и не содержит многоточия |
 

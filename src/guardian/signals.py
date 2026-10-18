@@ -42,6 +42,7 @@ class SignalsConfig:
     enable_duplicate_check: bool = True
     enable_action_claim_check: bool = True
     enable_request_alignment: bool = True
+    enable_success_after_failure: bool = True
     max_soft_hints: int = 12
 
     @classmethod
@@ -127,6 +128,21 @@ ACTION_CLAIM_RE = re.compile(
     r"updated|modified|changed|sent|transferred|refunded|processed|issued|"
     r"activated|deactivated|suspended|resumed|opened|closed|applied|submitted|"
     r"exchanged|returned|scheduled|reset|unlocked|blocked|paid|added|removed))\b",
+    re.IGNORECASE,
+)
+
+TOOL_FAILURE_RE = re.compile(
+    r'"error"\s*:\s*true|"success"\s*:\s*false|"status"\s*:\s*"(?:error|failed|failure)"'
+    r'|^\s*(?:error|failed|not found|invalid|denied)\b'
+    r'|\b(?:was|is) not found\b|\bhas failed\b|\bcould not be\b|\bunable to (?:process|complete)\b',
+    re.IGNORECASE,
+)
+SUCCESS_CLAIM_RE = re.compile(
+    r"\b(?:successfully|i(?:'ve| have)\s+(?:now\s+)?(?:cancelled|canceled|booked|updated|"
+    r"modified|changed|sent|transferred|refunded|processed|issued|activated|deactivated|"
+    r"suspended|resumed|opened|closed|applied|submitted|exchanged|returned|paid|added|removed))"
+    r"\b|\b(?:has|have) been (?:successfully )?(?:cancelled|canceled|booked|updated|refunded|"
+    r"processed|completed|confirmed|issued|sent)\b|\byou(?:'re| are) all set\b",
     re.IGNORECASE,
 )
 
@@ -481,6 +497,31 @@ def check_action_claim(
     ]
 
 
+def check_success_after_failure(
+    transcript: Transcript, response: ResponseTurn
+) -> list[Signal]:
+    """The response claims success but the latest tool output reports an error."""
+    if not response.text.strip() or not SUCCESS_CLAIM_RE.search(response.text):
+        return []
+    # Only the latest tool result matters: an error followed by a successful
+    # retry is normal and must not be flagged.
+    recent = transcript.tool_responses[-1:]
+    failed = [e for e in recent if TOOL_FAILURE_RE.search(e.content or "")]
+    if not failed:
+        return []
+    return [
+        Signal(
+            kind="claimed_success_after_tool_error",
+            severity="soft",
+            message=(
+                "the response claims that an action succeeded, but the most recent tool "
+                "result reports an error; check whether the action was actually performed"
+            ),
+            evidence=(failed[-1].content or "")[:300],
+        )
+    ]
+
+
 def check_request_alignment(
     transcript: Transcript, response: ResponseTurn
 ) -> list[Signal]:
@@ -567,6 +608,8 @@ def compute_signals(
         signals.extend(check_action_claim(transcript, response))
     if cfg.enable_request_alignment:
         signals.extend(check_request_alignment(transcript, response))
+    if cfg.enable_success_after_failure:
+        signals.extend(check_success_after_failure(transcript, response))
 
     # Deduplicate by (kind, message).
     uniq: dict[tuple[str, str], Signal] = {}

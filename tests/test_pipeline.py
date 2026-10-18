@@ -148,3 +148,15 @@ def test_heuristic_judge_prefers_hard_signals():
 
     verdict = heuristic_verdict([Signal("tool_not_available", "hard", "x")])
     assert verdict.label == 1
+
+
+def test_json_extraction_prefers_verdict_object():
+    from guardian.judge import parse_verdict
+
+    text = (
+        "The claim {amount} looks suspicious, but {x} is not real. "
+        'Final: {"claims": [], "label": 1, "confidence": 0.7}'
+    )
+    result = parse_verdict(text)
+    assert result.label == 1
+    assert not result.failed
