@@ -1,0 +1,185 @@
+name: build-submission
+
+# Build a complete, ready-to-upload competition archive on a GitHub-hosted
+# runner: fetch the judge weights, assemble submission.zip with the documented
+# layout, verify it, and publish it as Release assets the participant can
+# download from a browser.
+#
+# Why a runner: the development sandbox cannot reach huggingface.co, and
+# release-assets.githubusercontent.com is not reachable from it either, so the
+# ~10 GB of weights cannot be brought back into the sandbox. The runner has
+# full network access, so the finished archive is produced there instead.
+#
+# The archive is published as Release assets (< 2 GB each) rather than being
+# committed: model weights must never enter the repository history.
+
+on:
+  repository_dispatch:
+    types: [build-submission]
+  workflow_dispatch:
+    inputs:
+      model_id:
+        description: "Hugging Face model id for the judge"
+        required: false
+        default: "Qwen/Qwen2.5-14B-Instruct-AWQ"
+      download_weights:
+        description: "Download the weights (false = probe the runner only)"
+        required: false
+        default: "true"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-submission-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      MODEL_ID: ${{ github.event.client_payload.model_id || inputs.model_id || 'Qwen/Qwen2.5-14B-Instruct-AWQ' }}
+      DOWNLOAD_WEIGHTS: ${{ github.event.client_payload.download_weights || inputs.download_weights || 'true' }}
+      TARGET_REF: ${{ github.event.client_payload.ref || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.ref || github.ref_name }}
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Runner capacity probe
+        run: |
+          set -euo pipefail
+          df -h / | tail -2
+          FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          echo "FREE_GB=$FREE_GB" >> "$GITHUB_ENV"
+          {
+            echo "### runner capacity"
+            echo "- free on /: **${FREE_GB} GB**"
+            echo "- building needs ~2x the model size (weights + archive)"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DOWNLOAD_WEIGHTS" = "true" ] && [ "$FREE_GB" -lt 25 ]; then
+            echo "::error::only ${FREE_GB} GB free; need ~25 GB to build the archive"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install huggingface_hub pandas pyarrow
+
+      - name: Download judge weights
+        if: env.DOWNLOAD_WEIGHTS == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p model
+          python - <<'PY'
+          import os
+          from huggingface_hub import snapshot_download
+          mid = os.environ["MODEL_ID"]
+          path = snapshot_download(
+              repo_id=mid,
+              local_dir="model",
+              allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],
+              max_workers=4,
+          )
+          print("downloaded to", path)
+          PY
+          ls -la model | head -30
+          du -sh model
+
+      - name: Build archive
+        if: env.DOWNLOAD_WEIGHTS == 'true'
+        run: |
+          set -euo pipefail
+          python scripts/make_submission.py --check || true
+          python scripts/make_submission.py --model model --out submission.zip
+          ls -lh submission.zip
+          du -sh submission.zip
+          rm -rf model
+
+      - name: Verify archive
+        if: env.DOWNLOAD_WEIGHTS == 'true'
+        run: |
+          set -euo pipefail
+          unzip -t submission.zip | tail -3
+          echo "== structure =="
+          unzip -l submission.zip | head -25
+          echo "== required entries =="
+          for f in README.md pyproject.toml scripts/predict.py; do
+            unzip -l submission.zip "$f" | grep -q "$f" || { echo "MISSING $f"; exit 1; }
+            echo "ok: $f"
+          done
+          unzip -l submission.zip | grep -q "metrics/" && { echo "metrics/ must not be shipped"; exit 1; }
+          echo "no metrics/ directory: ok"
+          echo "== weights present in model/ =="
+          unzip -l submission.zip | grep -c "model/.*safetensors" || { echo "no weights"; exit 1; }
+
+      - name: Smoke test the entrypoint
+        if: env.DOWNLOAD_WEIGHTS == 'true'
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
+          unzip -q "$GITHUB_WORKSPACE/submission.zip"
+          # No GPU on the runner: this exercises the import path, the entrypoint
+          # and the output format, which is what the platform calls.
+          python scripts/predict.py --input "$GITHUB_WORKSPACE/valid.parquet" --output /tmp/smoke/pred.csv
+          head -c 4 /tmp/smoke/pred.csv | od -An -tx1
+          python - <<'PY'
+          import pandas as pd
+          d = pd.read_parquet("/tmp/smoke/pred.csv")
+          src = pd.read_parquet("valid.parquet")
+          assert list(d.columns) == ["id", "label"], d.columns
+          assert len(d) == len(src), (len(d), len(src))
+          assert list(d.id) == list(src.id), "ids must be unchanged"
+          assert set(d.label.unique()) <= {0, 1}
+          print("entrypoint OK:", len(d), "rows, positive rate", round(d.label.mean(), 3))
+          PY
+
+      - name: Split and publish to a Release
+        if: env.DOWNLOAD_WEIGHTS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          TAG="submission-$(date +%Y%m%d-%H%M)"
+          PART=1900M
+          split -b "$PART" -d -a 2 submission.zip submission.part.
+          PARTS=$(ls submission.part.* | wc -l)
+          echo "parts: $PARTS"
+          printf '%s  %s\n' "$(sha256sum submission.zip | cut -d' ' -f1)" submission.zip > submission.sha256
+          {
+            echo "# Guardian of Truth — готовый архив"
+            echo
+            echo "Полный архив: \`submission.zip\` (${PARTS} части(ей), каждая < 2 ГБ — лимит GitHub на файл)."
+            echo
+            echo '```bash'
+            echo "cat submission.part.* > submission.zip"
+            echo "sha256sum -c submission.sha256"
+            echo '```'
+            echo
+            echo "Затем загрузить \`submission.zip\` в виджет загрузки решения."
+            echo
+            echo "Модель судьи: \`${MODEL_ID}\`."
+            echo
+            echo '## Контрольные суммы частей'
+            echo '```'
+            sha256sum submission.part.*
+            echo '```'
+          } > submission.README.md
+          gh release create "$TAG" submission.part.* submission.sha256 submission.README.md \
+            --repo "$GITHUB_REPOSITORY" --title "Guardian of Truth submission $TAG" \
+            --notes "Built on a GitHub runner: weights fetched, archive assembled and verified."
+          echo "RELEASE: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+          {
+            echo "### submission.zip собран"
+            echo
+            echo "- релиз: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo "- частей: $PARTS"
+          } >> "$GITHUB_STEP_SUMMARY"
