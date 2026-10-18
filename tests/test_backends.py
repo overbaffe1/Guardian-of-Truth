@@ -46,6 +46,22 @@ class FakeLLM:
         return [_Output('{"label": 0, "confidence": 0.9}', n) for _ in prompts]
 
 
+class VerdictLLM(FakeLLM):
+    """Fake vLLM that answers 1 for the second-opinion prompt, 0 otherwise."""
+
+    def generate(self, prompts, params, use_tqdm=False):
+        self.prompts.extend(prompts)
+        n = getattr(params, "kwargs", {}).get("n", 1)
+        out = []
+        for prompt in prompts:
+            if "SECOND, independent review" in prompt:
+                text = '{"label": 1, "confidence": 0.9, "claims": [{"claim": "x", "status": "unsupported"}]}'
+            else:
+                text = '{"label": 0, "confidence": 0.9}'
+            out.append(_Output(text, n))
+        return out
+
+
 class FakeSamplingParams:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -93,6 +109,28 @@ def test_prefix_cache_fallback(fake_vllm):
     backend = VLLMBackend("fake-model", {"max_model_len": 32768})
     assert backend is not None
     assert "enable_prefix_caching" not in FakeLLM.instances[-1].kwargs
+
+
+def test_pipeline_runs_on_vllm_backend(fake_vllm, monkeypatch):
+    from guardian.config import RuntimeConfig
+    from guardian.pipeline import Detector
+
+    monkeypatch.setattr(FakeLLM, "generate", VerdictLLM.generate)
+    config = RuntimeConfig.load(overrides={"model": {"id": "fake-model", "batch_size": 2}})
+    detector = Detector(config, backend_name="vllm")
+    row = {
+        "id": "v1",
+        "prompt": (
+            "⟦SYSTEM⟧\nAgent.\n<policy>\nConfirm before acting.\n</policy>\n"
+            "[AVAILABLE TOOLS]\n- get_order: read an order\n"
+            "⟦USER⟧\nwhere is order #W1234567?\n"
+        ),
+        "response": "⟦ASSISTANT · ход 1⟧\nYour order is on the way.",
+    }
+    predictions = detector.predict_rows([row])
+    assert predictions[0].label == 1  # second opinion flipped it
+    assert detector.stats["verify_overrides"] == 1
+    assert detector.stats["backend"] == "vllm"
 
 
 def test_fit_user_content_never_exceeds_by_much():
