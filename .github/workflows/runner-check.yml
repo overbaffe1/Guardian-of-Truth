@@ -1,0 +1,33 @@
+name: runner-check
+
+# Minimal probe: are GitHub-hosted runners available for this repository, and
+# can they reach the storage hosts the development sandbox cannot?
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/runner-check.yml"
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Environment
+        run: |
+          set -x
+          python3 -V
+          uname -a
+          nproc
+          df -h / | tail -1
+          nvidia-smi || echo "no GPU on this runner"
+      - name: Network probe
+        run: |
+          set -x
+          for url in \
+            https://huggingface.co \
+            https://gv02-dsworks-obs01.obs.ru-moscow-1.hc.sbercloud.ru \
+            https://pypi.org ; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 "$url" || echo "ERR")
+            echo "$code  $url"
+          done
