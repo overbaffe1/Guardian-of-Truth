@@ -104,7 +104,7 @@ jobs:
         # release assets and let the participant build the archive locally,
         # which needs no extra disk.
         id: weights_only
-        if: steps.dl.outputs.low_disk == 'true'
+        if: ${{ steps.dl.outputs.low_disk == 'true' }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -140,7 +140,7 @@ jobs:
           PY
 
       - name: Build archive
-        if: steps.weights_only.outcome != 'success'
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           python scripts/make_submission.py --model model --out submission.zip
@@ -148,7 +148,7 @@ jobs:
           rm -rf model
 
       - name: Verify archive
-        if: steps.weights_only.outcome != 'success'
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           unzip -t submission.zip | tail -2
@@ -166,7 +166,7 @@ jobs:
           unzip -l submission.zip | head -20
 
       - name: Smoke test the entrypoint
-        if: steps.weights_only.outcome != 'success'
+        if: ${{ steps.weights_only.outcome != 'success' }}
         run: |
           set -euo pipefail
           rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
@@ -187,7 +187,7 @@ jobs:
           PY
 
       - name: Split and publish to a Release
-        if: steps.weights_only.outcome != 'success'
+        if: ${{ steps.weights_only.outcome != 'success' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
