@@ -75,29 +75,53 @@ def collect(root: Path, model_dir: Path | None = None) -> list[Path]:
             continue
         if path.is_dir():
             continue
-        if model_dir is not None and rel.parts[0] == "model" and not rel.parts[1:]:
-            # placeholder kept only when a checkpoint is mounted
-            continue
         files.append(rel)
     return files
 
 
-def check_structure(root: Path) -> list[str]:
+def plan_entries(root: Path, model_dir: Path | None = None) -> list[tuple[Path, Path]]:
+    """Map every archive-relative path to the file that will supply it.
+
+    Weights may live inside the tree (``--model model``) or anywhere on disk
+    (``--model /path/to/weights``). Both have to end up under ``model/`` in the
+    archive, and an entry must never be stored twice.
+    """
+    entries: list[tuple[Path, Path]] = []
+    seen: set[str] = set()
+
+    def add(rel: Path, source: Path) -> None:
+        key = str(rel)
+        if key in seen or not source.is_file():
+            return
+        seen.add(key)
+        entries.append((rel, source))
+
+    for rel in collect(root, model_dir):
+        add(rel, root / rel)
+
+    if model_dir is not None and model_dir.resolve() != (root / "model").resolve():
+        for extra in sorted(model_dir.rglob("*")):
+            add(Path("model") / extra.relative_to(model_dir), extra)
+    return entries
+
+
+def check_structure(root: Path, model_dir: Path | None = None) -> list[str]:
     problems: list[str] = []
     for required in REQUIRED:
         if not (root / required).exists():
             problems.append(f"missing required entry: {required}")
-    model = root / "model"
-    if not model.is_dir():
+    weights_root = model_dir if model_dir is not None else (root / "model")
+    if not weights_root.is_dir():
         problems.append("missing model/ directory")
     else:
         has_weights = any(
-            p.suffix in {".safetensors", ".bin", ".gguf", ".pt"} for p in model.rglob("*")
+            p.suffix in {".safetensors", ".bin", ".gguf", ".pt"}
+            for p in weights_root.rglob("*")
         )
         if not has_weights:
             problems.append(
-                "model/ contains no weights (.safetensors/.bin); the scoring "
-                "environment provides none, so they must ship in the archive"
+                f"{weights_root} contains no weights (.safetensors/.bin); the "
+                "scoring environment provides none, so they must ship in the archive"
             )
     if (root / "metrics").exists():
         problems.append("archive must not contain a metrics/ directory")
@@ -105,11 +129,7 @@ def check_structure(root: Path) -> list[str]:
 
 
 def build(root: Path, out: Path, model_dir: Path | None = None) -> int:
-    files = collect(root, model_dir)
-    if model_dir is not None:
-        for extra in sorted(model_dir.rglob("*")):
-            if extra.is_file():
-                files.append(Path("model") / extra.relative_to(model_dir))
+    entries = plan_entries(root, model_dir)
 
     tmp = out.with_suffix(out.suffix + ".tmp")
     with zipfile.ZipFile(tmp, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
@@ -119,16 +139,16 @@ def build(root: Path, out: Path, model_dir: Path | None = None) -> int:
             info = zipfile.ZipInfo(name + "/")
             info.external_attr = (DIR_MODE | 0o40000) << 16 | 0x10
             zf.writestr(info, b"")
-        for rel in files:
-            source = root / rel
-            if model_dir is not None and rel.parts[0] == "model" and not (root / rel).exists():
-                continue
+        for rel, source in entries:
             info = zipfile.ZipInfo(str(rel).replace(os.sep, "/"))
             info.external_attr = FILE_MODE << 16
             info.compress_type = zipfile.ZIP_DEFLATED
             # Stream the file: a 2 GB safetensors shard must not be read into
-            # memory in one go.
-            with open(source, "rb") as fh, zf.open(info, "w") as dest:
+            # memory in one go. ``force_zip64`` is required because the judge
+            # weights push the archive past the 4 GB boundary and zipfile cannot
+            # know an entry's size while streaming -- without it the build dies
+            # with "File size unexpectedly exceeded ZIP64 limit".
+            with open(source, "rb") as fh, zf.open(info, "w", force_zip64=True) as dest:
                 shutil.copyfileobj(fh, dest, length=4 << 20)
     tmp.replace(out)
     return out.stat().st_size
@@ -143,7 +163,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
-    problems = check_structure(root)
+    model_dir = Path(args.model).resolve() if args.model else None
+    problems = check_structure(root, model_dir)
     for problem in problems:
         print(f"WARNING: {problem}", file=sys.stderr)
 
@@ -151,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if problems else 0
 
     out = Path(args.out).resolve()
-    size = build(root, out, Path(args.model).resolve() if args.model else None)
+    size = build(root, out, model_dir)
     print(f"Wrote {out} ({size / 1024**3:.2f} GiB)")
     if size >= MAX_ARCHIVE_BYTES:
         print("ERROR: archive exceeds the 40 GB limit", file=sys.stderr)

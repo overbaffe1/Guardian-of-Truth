@@ -100,3 +100,49 @@ def test_check_reports_missing_weights(tmp_path):
         cwd=REPO,
     )
     assert "weights" in result.stderr
+
+def test_entries_are_written_with_zip64(tmp_path, monkeypatch):
+    """The judge weights push the archive past 4 GB.
+
+    zipfile cannot know an entry's size while it is streamed, so without
+    ``force_zip64`` the build dies with "File size unexpectedly exceeded ZIP64
+    limit" -- which is exactly how the first runner build failed.
+    """
+    sys.path.insert(0, str(REPO / "scripts"))
+    import make_submission
+
+    seen: list[bool] = []
+    real_open = zipfile.ZipFile.open
+
+    def spy(self, name, mode="r", *args, **kwargs):
+        if mode == "w":
+            # Directory stubs go through writestr and are tiny; only real files
+            # can cross the 4 GB boundary.
+            filename = getattr(name, "filename", name)
+            if not str(filename).endswith("/"):
+                seen.append(bool(kwargs.get("force_zip64")))
+        return real_open(self, name, mode, *args, **kwargs)
+
+    monkeypatch.setattr(zipfile.ZipFile, "open", spy)
+    make_submission.build(REPO, tmp_path / "s.zip", None)
+    assert seen, "nothing was written"
+    assert all(seen), "every entry must be written with force_zip64"
+
+
+def test_weights_from_an_external_directory_are_included(tmp_path):
+    """``--model /path/to/weights`` must actually put those files in model/."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    import make_submission
+
+    weights = tmp_path / "weights"
+    weights.mkdir()
+    (weights / "w.safetensors").write_bytes(b"x" * 1024)
+
+    out = tmp_path / "s.zip"
+    make_submission.build(REPO, out, weights)
+    with zipfile.ZipFile(out) as zf:
+        listed = zf.namelist()
+    assert len(listed) == len(set(listed)), "duplicate entries in the archive"
+    assert "model/w.safetensors" in listed
+    with zipfile.ZipFile(out) as zf:
+        assert zf.read("model/w.safetensors") == b"x" * 1024
