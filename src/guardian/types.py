@@ -153,7 +153,7 @@ class JudgeResult:
 
 @dataclass
 class Prediction:
-    id: str
+    id: Any
     label: int
     score: float = 0.0
     judge_label: Optional[int] = None

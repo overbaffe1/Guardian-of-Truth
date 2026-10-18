@@ -68,7 +68,8 @@ def read_table(path: str) -> list[dict[str, Any]]:
         row = dict(row)
         normalised.append(
             {
-                "id": str(_pick(row, _ID_ALIASES, i)),
+                # keep the original id value and type: the grader joins on it
+                "id": _pick(row, _ID_ALIASES, i),
                 "prompt": _pick(row, _PROMPT_ALIASES, ""),
                 "response": _pick(row, _RESPONSE_ALIASES, ""),
                 "label": row.get("label"),
@@ -89,7 +90,8 @@ def write_predictions(
     df = pd.DataFrame(rows)
     if df.empty:
         df = pd.DataFrame(columns=["id", "label"] + (["score"] if with_details else []))
-    df["id"] = df["id"].astype(str)
+    if df["id"].isna().any():
+        df["id"] = df["id"].fillna("")
     df["label"] = df["label"].astype(int)
 
     p = Path(path)

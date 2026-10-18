@@ -27,7 +27,7 @@ class PreparedItem:
     transcript: Transcript
     response: ResponseTurn
     signals: list[Signal]
-    external_id: str = ""
+    external_id: Any = ""
     messages: Optional[list[dict[str, str]]] = None
     verify_messages: Optional[list[dict[str, str]]] = None
     evidence_chars: int = 0
@@ -136,7 +136,7 @@ class Detector:
         prepared: list[PreparedItem] = []
         errors = 0
         for index, row in enumerate(rows):
-            external_id = str(row.get("id", index))
+            external_id = row.get("id", index)
             uid = f"{index}:{external_id}"
             prompt_text = row.get("prompt")
             response_raw = row.get("response")

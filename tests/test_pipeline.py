@@ -160,3 +160,26 @@ def test_json_extraction_prefers_verdict_object():
     result = parse_verdict(text)
     assert result.label == 1
     assert not result.failed
+
+
+def test_ids_preserve_input_dtype(tmp_path):
+    pd = pytest.importorskip("pandas")
+    df = pd.DataFrame(
+        {
+            "id": [10, 20],
+            "prompt": [SYSTEM + "⟦USER⟧\nhello\n"] * 2,
+            "response": ["⟦ASSISTANT · ход 1⟧\nHello, how can I help?"] * 2,
+        }
+    )
+    src = tmp_path / "in.parquet"
+    df.to_parquet(src, index=False)
+
+    detector = Detector(RuntimeConfig.load(), backend=None, auto_load_backend=False)
+    predictions = detector.predict_rows(read_table(str(src)))
+    assert [p.id for p in predictions] == [10, 20]
+
+    out = tmp_path / "out.parquet"
+    write_predictions(str(out), predictions)
+    back = pd.read_parquet(out)
+    assert back["id"].tolist() == [10, 20]
+    assert list(back.columns) == ["id", "label"]
