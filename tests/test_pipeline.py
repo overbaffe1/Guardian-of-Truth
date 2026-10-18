@@ -183,3 +183,50 @@ def test_ids_preserve_input_dtype(tmp_path):
     back = pd.read_parquet(out)
     assert back["id"].tolist() == [10, 20]
     assert list(back.columns) == ["id", "label"]
+
+
+class VerifyBackend(BaseBackend):
+    """First pass says 0, second opinion says 1."""
+
+    name = "verify"
+
+    def __init__(self):
+        self.systems = []
+
+    def generate(self, requests):
+        out = []
+        for request in requests:
+            system = request.messages[0]["content"]
+            self.systems.append(system)
+            if "SECOND, independent review" in system:
+                out.append(['{"label": 1, "confidence": 0.9, "claims": '
+                            '[{"claim": "x", "status": "unsupported"}]}'])
+            else:
+                out.append(['{"label": 0, "confidence": 0.9}'])
+        return out
+
+
+def test_pipeline_uses_second_opinion():
+    row = dict(CLEAN_ROW)
+    row["id"] = "verify-1"
+    backend = VerifyBackend()
+    detector = Detector(RuntimeConfig.load(), backend=backend, auto_load_backend=False)
+    predictions = detector.predict_rows([row])
+    assert predictions[0].label == 1
+    assert detector.stats["verified"] == 1
+    assert detector.stats["verify_overrides"] == 1
+    assert any("SECOND, independent review" in s for s in backend.systems)
+
+
+def test_pipeline_second_opinion_can_be_disabled():
+    row = dict(CLEAN_ROW)
+    row["id"] = "verify-2"
+    backend = VerifyBackend()
+    detector = Detector(
+        RuntimeConfig.load(overrides={"judge": {"verify_negatives": False}}),
+        backend=backend,
+        auto_load_backend=False,
+    )
+    predictions = detector.predict_rows([row])
+    assert predictions[0].label == 0
+    assert detector.stats["verified"] == 0
