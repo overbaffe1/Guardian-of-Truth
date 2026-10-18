@@ -231,6 +231,14 @@ class TransformersBackend(BaseBackend):
 # ---------------------------------------------------------------------------
 
 
+def _has_weights(directory: str) -> bool:
+    if not os.path.isdir(directory):
+        return False
+    return any(
+        name.endswith((".safetensors", ".bin", ".gguf", ".pt")) for name in os.listdir(directory)
+    )
+
+
 def resolve_model_path(cfg: dict[str, Any]) -> str:
     explicit = (cfg.get("path") or "").strip()
     if explicit:
@@ -240,11 +248,24 @@ def resolve_model_path(cfg: dict[str, Any]) -> str:
         return env
     # default location used by the Docker image / download script
     local = os.path.join(os.getcwd(), "model")
-    if os.path.isdir(local) and any(
-        name.endswith((".safetensors", ".bin")) for name in os.listdir(local)
-    ):
+    if _has_weights(local):
         return local
     return str(cfg.get("id"))
+
+
+def enable_offline_hub() -> None:
+    """Stop the stack from trying to download weights over the network.
+
+    The scoring machine has no internet access. Without this, a missing or
+    mistyped checkpoint makes the backend block on Hugging Face retries and burn
+    the whole time budget before the rule fallback can answer. Set
+    ``GUARDIAN_ALLOW_DOWNLOAD=1`` to opt back in.
+    """
+    if os.environ.get("GUARDIAN_ALLOW_DOWNLOAD") == "1":
+        return
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+    os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 
 
 def create_backend(
@@ -254,6 +275,7 @@ def create_backend(
     requested = (requested or "auto").lower()
     if requested == "heuristic":
         return None
+    enable_offline_hub()
     model_path = resolve_model_path(cfg)
 
     errors: list[str] = []

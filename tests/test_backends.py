@@ -138,3 +138,22 @@ def test_fit_user_content_never_exceeds_by_much():
     fitted = fit_user_content(content, 1000)
     assert "RESP" in fitted
     assert len(fitted) <= 1100
+
+
+def test_offline_hub_is_enabled_by_default(monkeypatch):
+    """The scoring machine has no internet: a missing checkpoint must fail fast
+    instead of blocking on Hugging Face retries and eating the time budget."""
+    import os
+
+    from guardian.backends import enable_offline_hub
+
+    for var in ("GUARDIAN_ALLOW_DOWNLOAD", "HF_HUB_OFFLINE", "TRANSFORMERS_OFFLINE"):
+        monkeypatch.delenv(var, raising=False)
+    enable_offline_hub()
+    assert os.environ["HF_HUB_OFFLINE"] == "1"
+    assert os.environ["TRANSFORMERS_OFFLINE"] == "1"
+
+    monkeypatch.setenv("GUARDIAN_ALLOW_DOWNLOAD", "1")
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    enable_offline_hub()
+    assert "HF_HUB_OFFLINE" not in os.environ
