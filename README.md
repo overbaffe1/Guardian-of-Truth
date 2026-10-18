@@ -90,7 +90,10 @@ pip install .
 python scripts/predict.py --input test.parquet --output predictions.parquet
 ```
 
-* `predictions.parquet` содержит ровно колонки `id`, `label` (0/1).
+* `predictions.parquet` содержит ровно колонки `id`, `label` (0/1); тип `id`
+  сохраняется таким же, как во входном файле (int остаётся int, строка — строкой);
+* колонка `explanation` из публичного сплита **не используется** ни при обучении, ни на
+  инференсе: `read_table` её читает, но пайплайн получает только `prompt` и `response`.
 * `--with-details` добавляет `score`, `judge_label`, `judge_confidence`, `signals`, `reason`
   — удобно для анализа и калибровки.
 * `--backend heuristic` — режим без модели (только правила). Работает на CPU, ~500 примеров
