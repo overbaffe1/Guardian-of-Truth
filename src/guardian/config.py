@@ -17,7 +17,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "id": "Qwen/Qwen2.5-14B-Instruct-AWQ",
         "path": "",  # optional local directory with weights
         "max_model_len": 32768,
-        "max_prompt_tokens": 12000,
+        "max_prompt_tokens": 18000,
         "gpu_memory_utilization": 0.90,
         "dtype": "bfloat16",
         "load_in_4bit": False,
