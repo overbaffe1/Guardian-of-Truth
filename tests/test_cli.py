@@ -54,3 +54,28 @@ def test_blend_vote(tmp_path):
     result = pd.read_parquet(out)
     assert list(result.columns) == ["id", "label"]
     assert result["label"].tolist() == [0, 0, 1]
+
+
+def test_doctor_smoke_on_heuristic(tmp_path, capsys):
+    import pandas as pd
+
+    src = tmp_path / "in.parquet"
+    pd.DataFrame(
+        {
+            "id": ["a", "b"],
+            "prompt": [
+                "⟦SYSTEM⟧\nAgent.\n<policy>\nBe nice.\n</policy>\n⟦USER⟧\nhi\n",
+                "⟦SYSTEM⟧\nAgent.\n<policy>\nBe nice.\n</policy>\n⟦USER⟧\nbye\n",
+            ],
+            "response": ["⟦ASSISTANT · ход 1⟧\nHello!", "⟦ASSISTANT · ход 1⟧\nGoodbye!"],
+        }
+    ).to_parquet(src, index=False)
+
+    spec = importlib.util.spec_from_file_location("doctor_cli", ROOT / "scripts" / "doctor.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    code = module.main(["--input", str(src), "--limit", "2", "--backend", "heuristic"])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert '"rows": 2' in out

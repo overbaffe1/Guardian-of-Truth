@@ -5,6 +5,12 @@
 * GPU: 1× A100 (40 или 80 ГБ), CUDA-драйвер совместим с образом `vllm/vllm-openai:v0.6.6`.
 * Образ собран заранее, веса лежат в `/app/model` (см. `model/README.md`).
 * Проверка: `python -c "import vllm, guardian; print(vllm.__version__)"`.
+* Полный pre-flight (GPU, пакеты, веса, прогон 8 строк и прогноз времени на 543):
+  ```bash
+  python scripts/doctor.py --input public.parquet --limit 8
+  ```
+  В отчёте смотреть `stats.backend` (должен быть `vllm`, не `heuristic`),
+  `projected_sec_private` (< 1500) и `warnings`.
 
 ## 1. Публичный сплит (без спешки)
 

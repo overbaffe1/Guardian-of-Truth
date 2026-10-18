@@ -74,6 +74,7 @@ root/
     ├── download_model.py
     ├── calibrate.py           # подбор порога на public split
     ├── check_submission.py    # проверка формата сабмита
+    ├── doctor.py              # pre-flight: GPU, веса, прогноз времени
     ├── blend.py               # ансамбль нескольких предсказаний
     └── make_dev_from_tau2.py  # синтетический devset из tau2-bench
 ```
