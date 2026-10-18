@@ -52,11 +52,15 @@ jobs:
       TARGET_LABEL: ${{ github.event.client_payload.label || inputs.label || 'dataset' }}
       TARGET_LIMIT: ${{ github.event.client_payload.limit || inputs.limit || '0' }}
       STORE_RAW: ${{ github.event.client_payload.store_raw || inputs.store_raw || 'false' }}
-      REPORT_BRANCH: arena/ff28bb09-guardian-of-truth
+      # Which branch holds the code to evaluate, and which branch receives the
+      # aggregate report. Both default to the triggering ref but can be
+      # overridden per dispatch, so a report never lands on someone else's branch.
+      TARGET_REF: ${{ github.event.client_payload.ref || github.ref_name }}
+      REPORT_BRANCH: ${{ github.event.client_payload.report_branch || github.ref_name }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ github.event.client_payload.ref || github.ref_name }}
           fetch-depth: 0
 
       - uses: actions/setup-python@v5
@@ -89,10 +93,29 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/download"
-          OUT="$RUNNER_TEMP/download/$(basename "${TARGET_URL%%\?*}")"
-          echo "Downloading to $OUT"
-          curl -fL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
-               -o "$OUT" "$TARGET_URL" --progress-bar
+          RAW="$RUNNER_TEMP/download/download.bin"
+          # Several links separated by "|" are concatenated into one archive
+          # (split uploads of a multi-volume tar).
+          IFS='|' read -ra URLS <<< "$TARGET_URL"
+          : > "$RAW"
+          for u in "${URLS[@]}"; do
+            echo "Downloading part..."
+            curl -fL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 \
+                 -o "$RUNNER_TEMP/download/part.bin" "$u" --progress-bar
+            cat "$RUNNER_TEMP/download/part.bin" >> "$RAW"
+          done
+          # The presigned path is a bare UUID with no extension, so the file type
+          # is decided by its magic bytes instead of by its name.
+          magic=$(head -c 4 "$RAW" | od -An -tx1 | tr -d ' \n')
+          case "$magic" in
+            504b0304*) ext=".zip" ;;
+            50415231*) ext=".parquet" ;;
+            1f8b*)     ext=".tar.gz" ;;
+            *)         ext=".bin" ;;
+          esac
+          OUT="$RUNNER_TEMP/download/data$ext"
+          mv "$RAW" "$OUT"
+          echo "Detected type: $ext"
           ls -lh "$OUT"
           echo "size_bytes=$(stat -c%s "$OUT")" | tee -a "$GITHUB_STEP_SUMMARY"
           file "$OUT" || true
@@ -135,12 +158,22 @@ jobs:
             exit 0
           fi
           git commit -m "remote-eval: ${TARGET_LABEL} [skip ci]"
+          pushed=0
           for attempt in 1 2 3; do
-            git pull --rebase --autostash origin "${REPORT_BRANCH}" && \
-              git push origin "HEAD:${REPORT_BRANCH}" && break
+            if git pull --rebase --autostash origin "${REPORT_BRANCH}" && \
+               git push origin "HEAD:${REPORT_BRANCH}"; then
+              pushed=1
+              echo "report pushed to ${REPORT_BRANCH}"
+              break
+            fi
             echo "push attempt $attempt failed, retrying"
             sleep 5
           done
+          # Never let a lost report look like a green run.
+          if [ "$pushed" != "1" ]; then
+            echo "::error::could not push reports/${TARGET_LABEL}.json to ${REPORT_BRANCH}"
+            exit 1
+          fi
 
       - name: Upload raw file (only when explicitly requested)
         if: ${{ env.STORE_RAW == 'true' && env.TARGET_URL != 'fixture' }}
