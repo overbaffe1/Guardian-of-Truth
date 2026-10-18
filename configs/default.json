@@ -1,0 +1,65 @@
+{
+  "backend": "auto",
+  "model": {
+    "id": "Qwen/Qwen2.5-14B-Instruct-AWQ",
+    "path": "",
+    "max_model_len": 32768,
+    "max_prompt_tokens": 12000,
+    "gpu_memory_utilization": 0.9,
+    "dtype": "bfloat16",
+    "load_in_4bit": false,
+    "trust_remote_code": true,
+    "batch_size": 32,
+    "enable_prefix_caching": true
+  },
+  "evidence": {
+    "max_chars": 30000,
+    "policy_ratio": 0.4,
+    "tools_ratio": 0.08,
+    "max_tool_response_chars": 3500,
+    "max_tool_call_chars": 700,
+    "max_assistant_chars": 700,
+    "max_user_chars": 1800,
+    "keep_last_tool_responses": 4,
+    "max_selected_tool_responses": 40,
+    "max_json_items": 6
+  },
+  "signals": {
+    "enable_tool_availability": true,
+    "enable_schema_checks": true,
+    "enable_identifier_grounding": true,
+    "identifier_severity": "hard",
+    "enable_numeric_hints": true,
+    "enable_confirmation_check": true,
+    "enable_refusal_check": true,
+    "enable_duplicate_check": true,
+    "enable_action_claim_check": true,
+    "enable_request_alignment": true,
+    "max_soft_hints": 12,
+    "enable_success_after_failure": true
+  },
+  "judge": {
+    "temperature": 0.0,
+    "max_tokens": 448,
+    "self_consistency": 1,
+    "consistency_temperature": 0.4,
+    "min_confidence": 0.0,
+    "retry_on_parse_error": true,
+    "include_hints": true,
+    "batch_size": 32,
+    "verify_negatives": true,
+    "verify_threshold": 0.65,
+    "verify_max_tokens": 384,
+    "verify_temperature": 0.0
+  },
+  "fusion": {
+    "threshold": 0.5,
+    "rule_mode": "strict",
+    "soft_signal_override": 0.0
+  },
+  "runtime": {
+    "time_budget_sec": 1500,
+    "log_every": 25,
+    "fallback_on_backend_error": true
+  }
+}
