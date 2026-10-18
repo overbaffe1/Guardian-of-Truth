@@ -157,6 +157,24 @@ python scripts/evaluate.py --data public.parquet
 `evaluate.py` печатает F1/precision/recall, confusion matrix, долю положительных
 предсказаний и разбивку по типам искажений (для синтетического набора).
 
+## Удалённый прогон (GitHub Actions)
+
+Песочница разработки не видит внешнюю сеть, а данные соревнования лежат на Sber OBS.
+Для этого есть workflow `.github/workflows/remote-eval.yml`: он скачивает файл по ссылке
+на GitHub-раннере, считает метрики нашим пайплайном и коммитит **только агрегаты** в
+`reports/` (сырые строки в репозиторий не попадают).
+
+```bash
+gh api -X POST repos/overbaffe1/Guardian-of-Truth/dispatches \
+  -f event_type=remote-eval \
+  -F "client_payload[url]=<presigned link>" \
+  -F "client_payload[label]=public"
+
+git fetch origin && git show origin/arena/ff28bb09-guardian-of-truth:reports/public.json
+```
+
+Подробности и ограничения — [`docs/REMOTE.md`](docs/REMOTE.md).
+
 ## Проверка сабмита
 
 ```bash

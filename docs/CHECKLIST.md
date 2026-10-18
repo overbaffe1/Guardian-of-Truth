@@ -12,6 +12,19 @@
   В отчёте смотреть `stats.backend` (должен быть `vllm`, не `heuristic`),
   `projected_sec_private` (< 1500) и `warnings`.
 
+## 0.1. Если данных нет под рукой
+
+Ссылки на сплиты живут 24 часа и выдаются в интерфейсе соревнования. Скачать и посчитать
+метрики можно на GitHub-раннере, не дожидаясь A100:
+
+```bash
+gh api -X POST repos/overbaffe1/Guardian-of-Truth/dispatches \
+  -f event_type=remote-eval \
+  -F "client_payload[url]=<presigned link>" -F "client_payload[label]=public"
+```
+
+Результат — `reports/public.json` в ветке сессии (см. `docs/REMOTE.md`).
+
 ## 1. Публичный сплит (без спешки)
 
 ```bash
