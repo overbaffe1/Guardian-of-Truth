@@ -1,0 +1,10 @@
+{
+  "elapsed_sec": 0.0,
+  "file": {
+    "bytes": 984388,
+    "name": "9dfc9d63-486f-45aa-b284-2824f9af3001",
+    "sha256": "8e730cc999a6cf07c3f17f273300a17ce16539c5b6166885e74b41e93cfc47ba"
+  },
+  "label": "valid_full",
+  "note": "downloaded file is not a table; only metadata was collected"
+}
