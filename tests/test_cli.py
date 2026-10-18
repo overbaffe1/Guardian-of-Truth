@@ -34,3 +34,24 @@ def test_assign_dotted_path():
         "judge": {"verify_negatives": False, "verify_threshold": 0.7},
         "backend": "vllm",
     }
+
+
+def test_blend_vote(tmp_path):
+    import pandas as pd
+
+    predict = _load_predict()  # noqa: F841  (ensures scripts/ is importable)
+    a = tmp_path / "a.parquet"
+    b = tmp_path / "b.parquet"
+    out = tmp_path / "out.parquet"
+    pd.DataFrame({"id": ["1", "2", "3"], "label": [1, 0, 1]}).to_parquet(a, index=False)
+    pd.DataFrame({"id": ["1", "2", "3"], "label": [0, 0, 1]}).to_parquet(b, index=False)
+
+    spec = importlib.util.spec_from_file_location("blend_cli", ROOT / "scripts" / "blend.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    assert module.main(["--preds", str(a), str(b), "--out", str(out)]) == 0
+
+    result = pd.read_parquet(out)
+    assert list(result.columns) == ["id", "label"]
+    assert result["label"].tolist() == [0, 0, 1]

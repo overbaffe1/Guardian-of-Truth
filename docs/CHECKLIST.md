@@ -26,7 +26,10 @@ python scripts/calibrate.py --preds /tmp/public.parquet --truth public.parquet \
 * `signals.*.precision` — не даёт ли какой-то hard-сигнал ложных срабатываний
   (тогда `identifier_severity: "soft"` или `rule_mode: "hint"`);
 * `best_threshold` — порог, который сохранить в `configs/calibrated.json`;
-* `detector.elapsed_sec` — запас по времени (нужно < 1500 c на ~550 примеров).
+* `elapsed_sec` — запас по времени (нужно < 1500 c на ~550 примеров);
+* `verified` / `verify_overrides` — сколько отрицательных прошло второе мнение и сколько
+  из них перевернулось в `1`; если `verify_overrides` близко к нулю, второй проход можно
+  отключить и сэкономить время.
 
 ## 2. Приватный сплит
 
@@ -37,6 +40,9 @@ python scripts/predict.py \
 
 python scripts/check_submission.py --input private.parquet --preds /tmp/private.parquet
 ```
+
+Второй прогон «на всякий случай» с усреднением можно собрать как ансамбль двух файлов:
+`python scripts/blend.py --preds a.parquet b.parquet --out c.parquet --how vote`.
 
 Проверить:
 
@@ -54,7 +60,9 @@ python scripts/check_submission.py --input private.parquet --preds /tmp/private.
 | Слишком много ложных `1` | поднять `--threshold` до 0.6–0.7, `identifier_severity: "soft"` |
 | Слишком мало `1` | снизить порог до 0.35–0.4, включить `soft_signal_override` |
 | Долгая загрузка модели | кэшировать образ, веса уже внутри |
-| OOM | `gpu_memory_utilization: 0.85`, `max_model_len: 16384` |
+| OOM | `--set model.gpu_memory_utilization=0.85 --set model.max_model_len=16384` |
+| Второй проход не успевает | `--set judge.verify_negatives=false` (потеря ~нескольких recall-пунктов) |
+| Нужно быстро сравнить варианты | `--set judge.verify_threshold=0.6`, `--set fusion.rule_mode=hint` |
 
 ## 4. Сабмит
 

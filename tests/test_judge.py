@@ -126,3 +126,42 @@ def test_heuristic_confidence_is_label_consistent():
     clean = heuristic_verdict([], response_empty=True)
     assert clean.label == 0
     assert clean.confidence > 0.5
+
+
+def test_bad_claim_count_parsing():
+    from guardian.judge import bad_claim_count
+
+    text = (
+        '{"claims":[{"claim":"a","status":"grounded"},'
+        '{"claim":"b","status":"unsupported"}], "label": 1}'
+    )
+    assert bad_claim_count(text) == 1
+    assert bad_claim_count('{"label": 1}') is None
+    assert bad_claim_count("no json here") is None
+
+
+def test_second_opinion_must_list_a_bad_claim():
+    backend = ScriptedBackend(
+        first='{"label": 0, "confidence": 0.9}',
+        second=(
+            '{"claims":[{"claim":"total 24.74","status":"grounded"}],'
+            ' "label": 1, "confidence": 0.95}'
+        ),
+    )
+    runner = JudgeRunner(backend, {"verify_negatives": True, "verify_threshold": 0.65})
+    results = runner.run([_item("a")])
+    assert results["a"].label == 0
+    assert runner.verify_overrides == 0
+
+
+def test_second_opinion_with_bad_claim_overrides():
+    backend = ScriptedBackend(
+        first='{"label": 0, "confidence": 0.9}',
+        second=(
+            '{"claims":[{"claim":"refund 250 USD","status":"contradicted"}],'
+            ' "label": 1, "confidence": 0.9}'
+        ),
+    )
+    runner = JudgeRunner(backend, {"verify_negatives": True, "verify_threshold": 0.65})
+    results = runner.run([_item("a")])
+    assert results["a"].label == 1

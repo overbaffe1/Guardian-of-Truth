@@ -50,6 +50,40 @@ def _extract_json_object(text: str) -> Optional[dict[str, Any]]:
     return candidates[-1] if candidates else None
 
 
+_BAD_CLAIM_STATUSES = {
+    "unsupported",
+    "contradicted",
+    "action_error",
+    "policy_violation",
+    "ungrounded",
+    "not_supported",
+    "hallucination",
+    "false",
+}
+
+
+def bad_claim_count(text: str) -> Optional[int]:
+    """Number of claims marked as problematic in a judge reply.
+
+    Returns ``None`` when the reply has no parsable ``claims`` list (older or
+    shorter formats), so callers can decide whether the check applies.
+    """
+    payload = _extract_json_object(text or "")
+    if payload is None:
+        return None
+    claims = payload.get("claims")
+    if not isinstance(claims, list):
+        return None
+    count = 0
+    for claim in claims:
+        if not isinstance(claim, dict):
+            continue
+        status = str(claim.get("status", "")).strip().lower().replace(" ", "_")
+        if status in _BAD_CLAIM_STATUSES:
+            count += 1
+    return count
+
+
 def _coerce_label(value: Any) -> Optional[int]:
     if isinstance(value, bool):
         return int(value)
@@ -273,6 +307,10 @@ class JudgeRunner:
                 verdict = parse_verdict(texts[0])
                 self.verified += 1
                 if verdict.failed or verdict.label != 1 or verdict.confidence < threshold:
+                    continue
+                # Guard against a "1" that contradicts its own claim list.
+                if bad_claim_count(texts[0]) == 0:
+                    logger.debug("Second opinion said 1 but listed no bad claim; ignored")
                     continue
                 previous = results.get(item.uid)
                 if previous is None or previous.label != 0:

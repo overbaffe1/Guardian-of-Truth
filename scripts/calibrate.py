@@ -28,7 +28,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import pandas as pd  # noqa: E402
 
-from guardian.io_utils import best_threshold, compute_metrics  # noqa: E402
+from guardian.io_utils import best_threshold, compute_metrics, read_table  # noqa: E402
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -43,7 +43,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     preds = pd.read_parquet(args.preds) if args.preds.endswith((".parquet", ".pq")) else pd.read_csv(args.preds)
-    truth = pd.read_parquet(args.truth) if args.truth.endswith((".parquet", ".pq")) else pd.read_csv(args.truth)
+    truth = pd.DataFrame(read_table(args.truth))
 
     truth = truth[["id", "label"]].rename(columns={"label": "y"})
     truth["id"] = truth["id"].astype(str)
