@@ -1,0 +1,10 @@
+{
+  "elapsed_sec": 0.0,
+  "file": {
+    "bytes": 659,
+    "name": "config.json",
+    "sha256": "18e18afcaccafade98daf13a54092927904649e1dd4eba8299ab717d5d94ff45"
+  },
+  "label": "hf-smoke",
+  "note": "file parsed but does not look like a table of rows"
+}
