@@ -12,7 +12,7 @@ from .config import RuntimeConfig
 from .evidence import EvidenceConfig, build_evidence
 from .fusion import FusionConfig, fuse
 from .judge import JudgeItem, JudgeRunner
-from .prompts import build_messages
+from .prompts import build_messages, build_verify_messages
 from .signals import SignalsConfig, compute_signals, has_hard_signal
 from .toolspec import extract_available_tools
 from .transcript import parse_response, parse_transcript
@@ -29,6 +29,7 @@ class PreparedItem:
     signals: list[Signal]
     external_id: str = ""
     messages: Optional[list[dict[str, str]]] = None
+    verify_messages: Optional[list[dict[str, str]]] = None
     evidence_chars: int = 0
     rebuild: Optional[Any] = None
 
@@ -84,17 +85,24 @@ class Detector:
         if not response.text.strip() and not response.tool_calls:
             return item
         evidence = build_evidence(transcript, response, specs, self.evidence_cfg)
+        include_hints = bool(self.config.judge.get("include_hints", True))
         item.messages = build_messages(
             evidence.text,
             response,
             signals,
-            include_hints=bool(self.config.judge.get("include_hints", True)),
+            include_hints=include_hints,
         )
+        if bool(self.config.judge.get("verify_negatives", True)):
+            item.verify_messages = build_verify_messages(
+                evidence.text,
+                response,
+                signals,
+                include_hints=include_hints,
+            )
         item.evidence_chars = len(evidence.text)
 
         # Factory used by the runner to shrink the context if the run is
         # projected to exceed the 30-minute limit.
-        include_hints = bool(self.config.judge.get("include_hints", True))
 
         def rebuild(scale: float, _t=transcript, _r=response, _s=specs, _sig=signals):
             import dataclasses
@@ -108,6 +116,10 @@ class Detector:
             )
             ev = build_evidence(_t, _r, _s, smaller)
             item.evidence_chars = len(ev.text)
+            if item.verify_messages is not None:
+                item.verify_messages = build_verify_messages(
+                    ev.text, _r, _sig, include_hints=include_hints
+                )
             return build_messages(ev.text, _r, _sig, include_hints=include_hints)
 
         item.rebuild = rebuild
@@ -169,6 +181,7 @@ class Detector:
                 uid=item.uid,
                 messages=item.messages or [],
                 signals=item.signals,
+                verify_messages=item.verify_messages,
                 rebuild=item.rebuild,
             )
             for item in to_judge
@@ -195,6 +208,8 @@ class Detector:
             "errors": errors,
             "backend": self._backend_name,
             "failed_batches": runner.failed_batches,
+            "verified": runner.verified,
+            "verify_overrides": runner.verify_overrides,
             "elapsed_sec": round(time.monotonic() - started, 2),
         }
         return predictions

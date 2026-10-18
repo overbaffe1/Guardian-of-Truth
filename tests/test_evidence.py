@@ -109,7 +109,7 @@ def test_evidence_never_exceeds_budget_with_many_user_turns():
     system = "⟦SYSTEM⟧\nYou are an agent.\n<policy>\n" + ("Rule line. " * 2000) + "\n</policy>\n"
     turns = []
     for i in range(120):
-        turns.append(f"⟦USER⟧\n" + ("Long user message about a refund and a tariff. " * 40))
+        turns.append("⟦USER⟧\n" + ("Long user message about a refund and a tariff. " * 40))
         turns.append(f"⟦ASSISTANT · ход {i}⟧\n" + ("Filler answer. " * 60))
     prompt = system + "\n" + "\n".join(turns)
     transcript = parse_transcript(prompt)

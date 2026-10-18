@@ -35,6 +35,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "min_confidence": 0.0,        # below this the judge verdict is ignored
         "retry_on_parse_error": True,
         "include_hints": True,
+        # Second-opinion pass: responses cleared by the first pass are re-checked
+        # with a claim-by-claim prompt (recovers unsupported claims cheaply).
+        "verify_negatives": True,
+        "verify_threshold": 0.65,
+        "verify_max_tokens": 384,
+        "verify_temperature": 0.0,
     },
     "fusion": {
         "threshold": 0.5,

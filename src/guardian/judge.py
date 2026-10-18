@@ -216,6 +216,8 @@ class JudgeItem:
     uid: str
     messages: list[dict[str, str]]
     signals: list[Signal]
+    #: second-opinion prompt (used when the first pass answers 0)
+    verify_messages: Optional[list[dict[str, str]]] = None
     #: optional factory ``rebuild(scale) -> messages`` used to shrink the
     #: context when the run is projected to exceed the time budget
     rebuild: Optional[Any] = None
@@ -226,6 +228,64 @@ class JudgeRunner:
         self.backend = backend
         self.cfg = cfg
         self.failed_batches = 0
+        #: diagnostics for the second-opinion pass
+        self.verified = 0
+        self.verify_overrides = 0
+
+    # ------------------------------------------------------------------ verify
+    def _verify_negatives(
+        self,
+        items: list[JudgeItem],
+        results: dict[str, JudgeResult],
+        deadline: Optional[float],
+    ) -> None:
+        import time
+
+        threshold = float(self.cfg.get("verify_threshold", 0.65))
+        max_tokens = int(self.cfg.get("verify_max_tokens", self.cfg.get("max_tokens", 448)))
+        batch_size = max(1, int(self.cfg.get("batch_size", 16)))
+        for start in range(0, len(items), batch_size):
+            if deadline is not None and time.monotonic() > deadline:
+                logger.warning(
+                    "Deadline reached, skipping the second-opinion pass for %d items",
+                    len(items) - start,
+                )
+                return
+            batch = items[start : start + batch_size]
+            requests = [
+                GenerationRequest(
+                    messages=item.verify_messages or item.messages,
+                    max_tokens=max_tokens,
+                    temperature=float(self.cfg.get("verify_temperature", 0.0)),
+                    n=1,
+                )
+                for item in batch
+            ]
+            try:
+                outputs = self.backend.generate(requests)  # type: ignore[union-attr]
+            except Exception as exc:
+                self.failed_batches += 1
+                logger.error("Second-opinion batch failed (%s); skipping it", exc)
+                continue
+            for item, texts in zip(batch, outputs):
+                if not texts:
+                    continue
+                verdict = parse_verdict(texts[0])
+                self.verified += 1
+                if verdict.failed or verdict.label != 1 or verdict.confidence < threshold:
+                    continue
+                previous = results.get(item.uid)
+                if previous is None or previous.label != 0:
+                    continue
+                self.verify_overrides += 1
+                results[item.uid] = JudgeResult(
+                    label=1,
+                    confidence=max(verdict.confidence, previous.confidence),
+                    hallucination_type=verdict.hallucination_type or previous.hallucination_type,
+                    reason=("second opinion: " + (verdict.reason or ""))[:600],
+                    raw=verdict.raw,
+                    votes=[1],
+                )
 
     def run(self, items: list[JudgeItem], deadline: Optional[float] = None) -> dict[str, JudgeResult]:
         if not items:
@@ -325,4 +385,19 @@ class JudgeRunner:
                     except Exception:
                         pass
                 results[item.uid] = aggregate(runs)
+
+        if self.cfg.get("verify_negatives", True):
+            # Give up on the second pass if less than ~10% of the deadline is left.
+            if deadline is None or time.monotonic() < deadline - max(15.0, 0.05 * (deadline - run_started)):
+                pending = [
+                    item
+                    for item in items
+                    if item.verify_messages
+                    and item.uid in results
+                    and results[item.uid].label == 0
+                    and not results[item.uid].failed
+                ]
+                if pending:
+                    logger.info("Second opinion on %d responses cleared by the first pass", len(pending))
+                    self._verify_negatives(pending, results, deadline)
         return results

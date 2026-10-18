@@ -104,6 +104,65 @@ Analysis: 12.99 + 4.50 + 7.25 = 24.74, a direct computation from the context.
 Output: {"claims":[{"claim":"total is 24.74 USD","evidence":"items priced 12.99, 4.50, 7.25","status":"grounded"}],"label":0,"hallucination_type":"none","confidence":0.93,"reason":"Correct aggregation of the provided prices."}
 """
 
+VERIFY_SYSTEM_PROMPT = """You are a meticulous auditor of an AI customer-service agent.
+This is a SECOND, independent review of one agent turn. A first reviewer found no
+contextual hallucination; your job is to double-check that judgement, not to repeat it.
+
+# WHAT COUNTS AS A CONTEXTUAL HALLUCINATION (label = 1)
+A claim or action in the RESPONSE that the CONTEXT does not justify:
+1. CONTRADICTION - an amount, date, time, identifier, name, status, price, availability,
+   count or tool result that conflicts with the context.
+2. UNSUPPORTED - a concrete fact, number, reason, entity, document, condition, capability,
+   promise or policy rule that cannot be derived from the context, even if nothing
+   contradicts it explicitly.
+3. ACTION ERROR - a tool that is not in [AVAILABLE TOOLS], invalid or ungrounded arguments,
+   or a state-changing action without the confirmation the policy requires.
+4. POLICY VIOLATION - a mandatory policy rule broken in a way that changes the result.
+5. FALSE REFUSAL - refusing although policy and tools allow the request.
+
+# WHAT IS NOT (label = 0)
+- correct restatement, aggregation, filtering, sorting, rounding, reformatting, paraphrase;
+- tone, style, typos, politeness, terse or unhelpful wording;
+- internal reasoning whose final result is correct;
+- secondary fields that never reach the user and do not change the result;
+- asking for clarification or confirmation;
+- omitting information that the policy does not require.
+
+# METHOD
+Go claim by claim. For every concrete detail in the RESPONSE (numbers, ids, names, dates,
+statuses, promised actions) quote the exact context line that supports it. If you cannot
+find a supporting line, the claim is UNSUPPORTED. If a line says something different, the
+claim is CONTRADICTED. Then apply the decision test: would this detail or action change the
+outcome, or the data the user sees? Only then choose label 1.
+
+# OUTPUT
+Return ONLY a JSON object, no markdown, no text before or after:
+{"claims":[{"claim":"...","evidence":"exact quote from context or NONE","status":"grounded|unsupported|contradicted|action_error|policy_violation"}],
+ "label":0,
+ "hallucination_type":"none|contradiction|unsupported|tool_error|policy_violation|false_refusal",
+ "confidence":0.0,
+ "reason":"at most 40 words"}
+"""
+
+
+VERIFY_TEMPLATE = """[CONTEXT]
+{context}
+
+[RESPONSE UNDER AUDIT]
+<response_under_audit>
+{response}
+</response_under_audit>
+
+[AUTOMATED PRE-CHECKS]
+{hints}
+
+[FIRST-PASS OPINION]
+{first}
+
+Audit the response again, claim by claim. Do not defer to the first-pass opinion; it may
+have been too lenient. Return only the JSON object."""
+
+
 USER_TEMPLATE = """[CONTEXT]
 {context}
 
@@ -164,3 +223,22 @@ def fit_user_content(user_content: str, max_chars: int) -> str:
     if keep <= 500:
         return tail[:max_chars]
     return head[:keep] + "\n…\n" + tail
+
+def build_verify_messages(
+    context: str,
+    response: ResponseTurn,
+    signals: Optional[list[Signal]] = None,
+    first_opinion: str = "No contextual hallucination found.",
+    include_hints: bool = True,
+) -> list[dict[str, str]]:
+    """Second-opinion prompt used for responses the first pass cleared."""
+    user = VERIFY_TEMPLATE.format(
+        context=context,
+        response=response_as_text(response),
+        hints=format_hints(signals or [], include_hints),
+        first=first_opinion[:600],
+    )
+    return [
+        {"role": "system", "content": VERIFY_SYSTEM_PROMPT},
+        {"role": "user", "content": user},
+    ]

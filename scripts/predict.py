@@ -26,6 +26,37 @@ from guardian.io_utils import dump_debug, read_table, write_predictions  # noqa:
 from guardian.pipeline import Detector  # noqa: E402
 
 
+def _coerce(raw: str):
+    low = raw.lower()
+    if low in {"true", "yes", "on"}:
+        return True
+    if low in {"false", "no", "off"}:
+        return False
+    if low in {"none", "null"}:
+        return None
+    for cast in (int, float):
+        try:
+            return cast(raw)
+        except ValueError:
+            pass
+    return raw
+
+
+def _assign(target: dict, dotted: str, value) -> None:
+    """Set ``a.b.c = value`` inside a nested dict, creating levels as needed."""
+    parts = [p for p in dotted.split(".") if p]
+    if not parts:
+        return
+    node = target
+    for part in parts[:-1]:
+        nxt = node.get(part)
+        if not isinstance(nxt, dict):
+            nxt = {}
+            node[part] = nxt
+        node = nxt
+    node[parts[-1]] = value
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Guardian of Truth inference")
     parser.add_argument("--input", required=True, help="path to test parquet/csv/jsonl")
@@ -47,6 +78,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--self-consistency", type=int, default=None)
     parser.add_argument("--with-details", action="store_true", help="extra diagnostic columns")
     parser.add_argument("--debug-jsonl", default=None, help="dump per-row diagnostics")
+    parser.add_argument(
+        "--set",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="override any config key by dotted path, e.g. --set judge.verify_negatives=false",
+    )
     parser.add_argument("--dump-config", default=None, help="write the resolved config and exit")
     parser.add_argument("--quiet", action="store_true")
     return parser.parse_args(argv)
@@ -80,6 +118,11 @@ def main(argv: list[str] | None = None) -> int:
         overrides.setdefault("judge", {})["self_consistency"] = args.self_consistency
     if args.backend:
         overrides["backend"] = args.backend
+    for item in args.set:
+        if "=" not in item:
+            raise SystemExit(f"--set expects KEY=VALUE, got {item!r}")
+        key, _, raw = item.partition("=")
+        _assign(overrides, key.strip(), _coerce(raw.strip()))
 
     config = RuntimeConfig.load(args.config, overrides)
     if args.dump_config:
