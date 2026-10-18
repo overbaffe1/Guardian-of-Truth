@@ -171,17 +171,24 @@ def _context_norm(transcript: Transcript) -> str:
     return norm_token(transcript.raw)
 
 
-def _present_in_context(value: str, context_norm: str) -> bool:
+def _squeeze(text: str) -> str:
+    return re.sub(r"[\s\-_.]", "", text)
+
+
+def _present_in_context(
+    value: str, context_norm: str, context_squeezed: Optional[str] = None
+) -> bool:
     token = norm_token(value)
     if not token:
         return True
     if token in context_norm:
         return True
     # tolerate separators/spaces removed by renderers
-    squeezed = re.sub(r"[\s\-_.]", "", token)
+    squeezed = _squeeze(token)
     if len(squeezed) >= 5:
-        ctx_squeezed = re.sub(r"[\s\-_.]", "", context_norm)
-        return squeezed in ctx_squeezed
+        if context_squeezed is None:
+            context_squeezed = _squeeze(context_norm)
+        return squeezed in context_squeezed
     return False
 
 
@@ -308,6 +315,8 @@ def check_identifier_grounding(
     transcript: Transcript, response: ResponseTurn, severity: str = "hard"
 ) -> list[Signal]:
     context_norm = _context_norm(transcript)
+    # Squeezing is O(len(context)); do it once per row instead of per identifier.
+    context_squeezed = _squeeze(context_norm)
     signals: list[Signal] = []
     seen: set[str] = set()
 
@@ -316,7 +325,9 @@ def check_identifier_grounding(
         for key, value in (tc.args or {}).items():
             if not isinstance(value, str) or len(value) < 3:
                 continue
-            if _ID_ARG_RE.search(key) and not _present_in_context(value, context_norm):
+            if _ID_ARG_RE.search(key) and not _present_in_context(
+                value, context_norm, context_squeezed
+            ):
                 if value.lower() in seen:
                     continue
                 seen.add(value.lower())
@@ -338,7 +349,7 @@ def check_identifier_grounding(
             if key in seen:
                 continue
             seen.add(key)
-            if _present_in_context(value, context_norm):
+            if _present_in_context(value, context_norm, context_squeezed):
                 continue
             signals.append(
                 Signal(

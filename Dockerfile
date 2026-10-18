@@ -21,13 +21,17 @@ RUN pip install --no-cache-dir /app
 COPY scripts /app/scripts
 COPY configs /app/configs
 
-# 3. Judge weights.
+# 3. Judge weights: use ./model if it already contains a checkpoint, otherwise
+#    download them at build time.  SKIP_MODEL_DOWNLOAD=1 keeps the image small
+#    when the weights are mounted at run time instead.
 ARG MODEL_ID=Qwen/Qwen2.5-14B-Instruct-AWQ
 ARG MODEL_DIR=/app/model
 ARG SKIP_MODEL_DOWNLOAD=0
-RUN if [ "$SKIP_MODEL_DOWNLOAD" = "0" ]; then \
+ENV HF_HOME=/app/.hf_cache
+COPY model /app/model
+RUN if [ "$SKIP_MODEL_DOWNLOAD" = "0" ] && [ ! -f "$MODEL_DIR/config.json" ]; then \
         python /app/scripts/download_model.py --model-id "$MODEL_ID" --out "$MODEL_DIR"; \
-    else echo "model download skipped"; fi
+    else echo "model download skipped (bundled weights or SKIP_MODEL_DOWNLOAD=1)"; fi
 
 ENV GUARDIAN_MODEL_ID=${MODEL_ID} \
     GUARDIAN_MODEL_PATH=${MODEL_DIR}
