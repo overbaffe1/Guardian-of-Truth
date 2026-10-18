@@ -39,7 +39,6 @@ def test_assign_dotted_path():
 def test_blend_vote(tmp_path):
     import pandas as pd
 
-    predict = _load_predict()  # noqa: F841  (ensures scripts/ is importable)
     a = tmp_path / "a.parquet"
     b = tmp_path / "b.parquet"
     out = tmp_path / "out.parquet"
