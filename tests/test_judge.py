@@ -119,13 +119,32 @@ def test_no_backend_falls_back_to_heuristics():
 
 def test_heuristic_confidence_is_label_consistent():
     positive = heuristic_verdict(
-        [Signal(kind="ungrounded_number", severity="soft", message="m")]
+        [Signal(kind="tool_not_available", severity="soft", message="m")]
     )
     assert positive.label == 1
     assert positive.confidence > 0.5
     clean = heuristic_verdict([], response_empty=True)
     assert clean.label == 0
     assert clean.confidence > 0.5
+
+
+def test_low_precision_hints_never_decide_on_their_own():
+    """`ungrounded_number` and `possible_false_refusal` both fired on true
+    negatives in the real labelled slice, so they must not flip a row by
+    themselves when no judge is available."""
+    for kind in ("ungrounded_number", "possible_false_refusal"):
+        verdict = heuristic_verdict([Signal(kind=kind, severity="soft", message="m")])
+        assert verdict.label == 0, f"{kind} should not decide alone"
+        assert verdict.confidence > 0.5
+
+
+def test_high_precision_hint_decides_without_a_judge():
+    """A single precisely-grounded rule is enough when the model is missing."""
+    verdict = heuristic_verdict(
+        [Signal(kind="tool_not_available", severity="soft", message="m")]
+    )
+    assert verdict.label == 1
+    assert verdict.confidence > 0.5
 
 
 def test_bad_claim_count_parsing():

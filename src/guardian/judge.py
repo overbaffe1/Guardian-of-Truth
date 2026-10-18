@@ -186,20 +186,32 @@ def aggregate(runs: list[JudgeResult]) -> JudgeResult:
 # Deterministic fallback
 # ---------------------------------------------------------------------------
 
+#: Weight of each soft hint when no LLM verdict is available. Re-fitted on the
+#: real labelled slice (see reports/valid-rules.json): a weight at or above the
+#: fire score below makes that single hint decide the row on its own, so the
+#: weights track the measured per-signal precision.
 SOFT_WEIGHTS = {
+    # precision 1.00 (n=6): the catalogue is parsed from the very block the
+    # agent saw, so an undeclared tool is a reliable error.
+    "tool_not_available": 0.9,
+    "placeholder_argument": 0.9,
+    # precision 1.00 (n=1-2) on real labels: invented or mis-targeted entities
+    # change what the user sees.
     "ungrounded_email": 1.4,
     "ungrounded_phone": 1.4,
     "ungrounded_doc_id": 1.5,
     "ungrounded_order_id": 1.4,
     "ungrounded_code": 1.0,
     "ungrounded_argument": 1.3,
-    "ungrounded_number": 0.9,
-    "missing_confirmation": 0.7,
-    "possible_false_refusal": 0.6,
-    "claimed_action_without_tool_call": 0.7,
-    "action_targets_unrequested_entity": 0.8,
+    "action_targets_unrequested_entity": 0.85,
+    "claimed_action_without_tool_call": 0.85,
+    "duplicate_tool_call": 0.85,
+    "missing_confirmation": 0.85,
     "claimed_success_after_tool_error": 0.9,
-    "duplicate_tool_call": 0.2,
+    # Deliberately weak: both fired on true negatives in the real slice
+    # (precision 0.00 and 0.33). They stay as judge hints, never decisive.
+    "ungrounded_number": 0.35,
+    "possible_false_refusal": 0.35,
     "unparseable_arguments": 0.2,
 }
 
