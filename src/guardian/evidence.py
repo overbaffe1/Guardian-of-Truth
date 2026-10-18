@@ -259,7 +259,14 @@ def build_evidence(
 
     # -- 3. conversation -----------------------------------------------------
     overhead = len(policy) + len(tools_text) + 200
-    convo_budget = max(4_000, total_budget - overhead)
+    # User turns are always kept (they carry the request), so reserve space for
+    # them up front instead of letting them push the text over the budget.
+    user_reserve = sum(
+        min(len(e.content), cfg.max_user_chars) + 24
+        for e in transcript.events
+        if e.kind == "user"
+    )
+    convo_budget = max(2_000, total_budget - overhead - user_reserve)
     selected_orders, payloads = select_tool_responses(transcript, response, cfg, convo_budget)
     selected_set = set(selected_orders)
 
@@ -292,25 +299,35 @@ def build_evidence(
         else:
             continue
 
-        if used_convo + len(chunk) > convo_budget and event.kind not in ("user",):
+        if used_convo + len(chunk) > convo_budget:
             truncated = True
             if event.kind == "tool_response" and event.order in selected_set:
                 # shrink this payload instead of dropping it
                 remaining = max(200, convo_budget - used_convo - 80)
                 body = truncate_middle(payloads.get(event.order, ""), remaining)
                 chunk = f"  ← TOOL_RESPONSE {event.tool_name or ''}: {body}"
+            elif event.kind == "user":
+                # a user turn is never dropped, only shrunk
+                remaining = max(120, convo_budget - used_convo - 16)
+                chunk = f"⟦USER⟧\n{truncate_middle(event.content, remaining)}"
             else:
                 continue
         rendered.append(chunk)
         used_convo += len(chunk)
 
-    text = (
+    header = (
         "⟦SYSTEM⟧\n"
         f"{policy}\n\n"
         "[AVAILABLE TOOLS]\n"
         f"{tools_text}\n\n"
-        + "\n\n".join(rendered)
     )
+    text = header + "\n\n".join(rendered)
+    # Final hard clamp: drop the oldest conversation chunks until the budget is
+    # respected, so a burst of long user turns can never overflow the context.
+    while len(text) > total_budget and rendered:
+        truncated = True
+        rendered.pop(0)
+        text = header + "\n\n".join(rendered)
     return Evidence(
         text=text,
         policy_excerpt=policy,

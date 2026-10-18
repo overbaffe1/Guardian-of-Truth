@@ -99,3 +99,44 @@ def test_long_banking_context_is_compressed():
     assert len(evidence.text) <= 14000
     assert "25 USD" in evidence.text  # the relevant document survived
     assert evidence.selected_tool_responses < evidence.total_tool_responses
+
+
+def test_evidence_never_exceeds_budget_with_many_user_turns():
+    from guardian.evidence import EvidenceConfig, build_evidence
+    from guardian.toolspec import extract_available_tools
+    from guardian.transcript import parse_response, parse_transcript
+
+    system = "⟦SYSTEM⟧\nYou are an agent.\n<policy>\n" + ("Rule line. " * 2000) + "\n</policy>\n"
+    turns = []
+    for i in range(120):
+        turns.append(f"⟦USER⟧\n" + ("Long user message about a refund and a tariff. " * 40))
+        turns.append(f"⟦ASSISTANT · ход {i}⟧\n" + ("Filler answer. " * 60))
+    prompt = system + "\n" + "\n".join(turns)
+    transcript = parse_transcript(prompt)
+    response = parse_response("⟦ASSISTANT · ход 999⟧\nAll done.")
+    cfg = EvidenceConfig(max_chars=12_000)
+    evidence = build_evidence(
+        transcript, response, extract_available_tools(transcript.system_text), cfg
+    )
+    assert len(evidence.text) <= cfg.max_chars
+    assert "⟦USER⟧" in evidence.text
+
+
+def test_evidence_keeps_all_user_turns_when_they_fit():
+    from guardian.evidence import EvidenceConfig, build_evidence
+    from guardian.toolspec import extract_available_tools
+    from guardian.transcript import parse_response, parse_transcript
+
+    prompt = (
+        "⟦SYSTEM⟧\nAgent.\n<policy>\nBe nice to the customer.\n</policy>\n"
+        "⟦USER⟧\nI want a refund.\n⟦ASSISTANT · ход 1⟧\nSure.\n⟦USER⟧\nFor order W1.\n"
+    )
+    transcript = parse_transcript(prompt)
+    response = parse_response("⟦ASSISTANT · ход 2⟧\nDone.")
+    cfg = EvidenceConfig(max_chars=12_000)
+    evidence = build_evidence(
+        transcript, response, extract_available_tools(transcript.system_text), cfg
+    )
+    assert evidence.text.count("⟦USER⟧") == 2
+    assert "I want a refund." in evidence.text
+    assert "For order W1." in evidence.text
