@@ -13,6 +13,12 @@ name: remote-eval
 on:
   repository_dispatch:
     types: [remote-eval]
+  # Self-test: validates the runner itself (install, download, metrics, commit)
+  # without needing a URL. Runs only when the workflow or the script changes.
+  push:
+    paths:
+      - ".github/workflows/remote-eval.yml"
+      - ".github/scripts/remote_eval.py"
   workflow_dispatch:
     inputs:
       url:
@@ -61,8 +67,13 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${TARGET_URL:-}" ]; then
-            echo "::error::No URL provided (client_payload.url or inputs.url)"
-            exit 1
+            # Self-test mode: no URL supplied (push trigger). Evaluate the small
+            # committed fixture so the runner path is still exercised.
+            echo "::notice::No URL supplied - running the self-test on the committed fixture"
+            echo "TARGET_URL=fixture" >> "$GITHUB_ENV"
+            echo "TARGET_LABEL=fixture" >> "$GITHUB_ENV"
+            echo "FIXTURE=$GITHUB_WORKSPACE/tests/fixtures/tau2_samples.jsonl" >> "$GITHUB_ENV"
+            exit 0
           fi
           echo "::add-mask::$TARGET_URL"
           echo "label=$TARGET_LABEL limit=$TARGET_LIMIT store_raw=$STORE_RAW"
@@ -73,6 +84,7 @@ jobs:
           python -m pip install . pandas pyarrow
 
       - name: Download (external network)
+        if: env.TARGET_URL != 'fixture'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/download"
@@ -90,8 +102,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p reports
+          if [ "${TARGET_URL:-}" = "fixture" ]; then
+            INPUT="$FIXTURE"
+            TARGET_LABEL=fixture
+            echo "TARGET_LABEL=fixture" >> "$GITHUB_ENV"
+          else
+            INPUT="$DOWNLOAD_PATH"
+          fi
           python .github/scripts/remote_eval.py \
-            --input "$DOWNLOAD_PATH" \
+            --input "$INPUT" \
             --label "$TARGET_LABEL" \
             --limit "${TARGET_LIMIT:-0}" \
             --extract-dir "$RUNNER_TEMP/extracted" \
@@ -123,7 +142,7 @@ jobs:
           done
 
       - name: Upload raw file (only when explicitly requested)
-        if: ${{ env.STORE_RAW == 'true' }}
+        if: ${{ env.STORE_RAW == 'true' && env.TARGET_URL != 'fixture' }}
         uses: actions/upload-artifact@v4
         with:
           name: raw-${{ env.TARGET_LABEL }}
