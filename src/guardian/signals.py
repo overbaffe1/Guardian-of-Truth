@@ -17,11 +17,12 @@ reading is emitted as a ``soft`` hint that is passed to the judge.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Iterable, Optional
 
-from .text_utils import canonical_number, norm_token, numbers_normalized
+from .text_utils import canonical_number, lenient_json_loads, norm_token, numbers_normalized
 from .toolspec import ToolSpec, validate_tool_call
 from .types import ResponseTurn, Signal, Transcript
 
@@ -34,6 +35,7 @@ from .types import ResponseTurn, Signal, Transcript
 class SignalsConfig:
     enable_tool_availability: bool = True
     enable_schema_checks: bool = True
+    enable_placeholder_check: bool = True
     enable_identifier_grounding: bool = True
     identifier_severity: str = "hard"  # "hard" | "soft"
     enable_numeric_hints: bool = True
@@ -107,42 +109,98 @@ MUTATING_VERBS = (
 )
 _MUTATING_RE = re.compile(r"(?:^|_)(%s)" % "|".join(MUTATING_VERBS), re.IGNORECASE)
 
+# --------------------------------------------------------------------------
+# Russian vocabulary
+# --------------------------------------------------------------------------
+# Roughly 60% of the public split is written in Russian, so an English-only
+# lexicon silently disables half of the rule stage. The Russian patterns below
+# mirror their English counterparts one-to-one; both languages are always
+# tested. Gendered past-tense verbs appear in both forms because the agent
+# persona may be written as male or female.
+_RU_ACT_VERBS = (
+    r"(?:отправил|отправила|сбросил|сбросила|настроил|настроила|обновил|обновила|"
+    r"отменил|отменила|забронировал|забронировала|оформил|оформила|"
+    r"перев[её]л|перевела|вернул|вернула|выполнил|выполнила|закрыл|закрыла|"
+    r"открыл|открыла|изменил|изменила|запустил|запустила|применил|применила|"
+    r"подтвердил|подтвердила|создал|создала|активировал|активировала|"
+    r"отключил|отключила|разблокировал|разблокировала|продлил|продлила|"
+    r"подключил|подключила|оплатил|оплатила|выполняю|выполняем|запускаю|запускаем)"
+)
+# Resultative / passive participles: "команда отправлена", "сброс выполнен".
+_RU_DONE_VERBS = (
+    r"(?:отправлен|отправлена|сброшен|сброшена|настроен|настроена|обновл[её]н|обновлен|"
+    r"отмен[её]н|отменен|забронирован|оформлен|перевед[её]н|переведен|выполнен|"
+    r"закрыт|открыт|измен[её]н|изменен|активирован|отключ[её]н|отключен|"
+    r"разблокирован|запущен|примен[её]н|применен|создан|подтвержд[её]н|подтвержден|"
+    r"восстановлен|оплачен|подключ[её]н|подключен|продл[её]н|продлен)"
+)
+
 AFFIRMATIVE_RE = re.compile(
     r"\b(yes|yeah|yep|sure|okay|ok|confirm(?:ed)?|correct|go ahead|please do|"
-    r"proceed|that works|sounds good|do it|i confirm|absolutely|agreed?)\b",
-    re.IGNORECASE,
+    r"proceed|that works|sounds good|do it|i confirm|absolutely|agreed?)\b"
+    # Russian: a confirmation almost always opens the message ("Да, подтверждаю").
+    # Bare "да"/"нет" appear inside ordinary sentences ("у меня нет данных"), so
+    # the Russian branch is anchored to the start of a line instead.
+    r"|^\s*(?:да[,\s!]|давайте|конечно|согласен|согласна|подтвержда|подтверждаю|"
+    r"подтверждаем|хорошо|отлично|вс[её] верно|верно|однозначно|выполняй|делай)",
+    re.IGNORECASE | re.UNICODE | re.MULTILINE,
 )
-NEGATIVE_RE = re.compile(r"\b(no|nope|don't|do not|cancel that|stop|wait)\b", re.IGNORECASE)
+NEGATIVE_RE = re.compile(
+    r"\b(no|nope|don't|do not|cancel that|stop|wait)\b"
+    r"|^\s*(?:нет[,\s!]|нет\s*$|отмена|отмени|отмените|стоп|подождит?е?)",
+    re.IGNORECASE | re.UNICODE | re.MULTILINE,
+)
 
 REFUSAL_RE = re.compile(
     r"\b(i (?:can ?not|can't|am unable|'m unable|am not able|'m not able)|"
     r"unable to|not allowed|not permitted|not possible|"
     r"(?:do not|don't) have (?:access|the ability|the capability)|"
     r"no (?:access|ability)|cannot (?:help|assist|do|provide|access|process)|"
-    r"i(?:'m| am) (?:not )?(?:authorized|authorised))\b",
-    re.IGNORECASE,
+    r"i(?:'m| am) (?:not )?(?:authorized|authorised))\b"
+    # Russian: claims of inability / lack of access, incl. polite refusals.
+    r"|(?:не смогу|не могу|не получит[ьи]ся|не удастся|мне не удастся|"
+    r"не в состоянии|у меня нет возможности|не имею возможности|"
+    r"у меня нет доступа|нет доступа к|не могу выполнить|не могу предоставить|"
+    r"не могу сделать|не получится выполнить|я не умею|не имею права|"
+    r"не уполномочен|не разрешено|это невозможно)",
+    re.IGNORECASE | re.UNICODE,
 )
 
 ACTION_CLAIM_RE = re.compile(
     r"\b(?:i(?:'ve| have)?\s+(?:successfully\s+)?(?:booked|cancelled|canceled|"
     r"updated|modified|changed|sent|transferred|refunded|processed|issued|"
     r"activated|deactivated|suspended|resumed|opened|closed|applied|submitted|"
-    r"exchanged|returned|scheduled|reset|unlocked|blocked|paid|added|removed))\b",
-    re.IGNORECASE,
+    r"exchanged|returned|scheduled|reset|unlocked|blocked|paid|added|removed))\b"
+    # Russian: the agent narrates an action in the past tense, or states that
+    # the action has been carried out, while the turn contains no tool call.
+    rf"|(?:(?:^|[^\w])(?:я|мы)\s+(?:уже\s+|ещ[её]\s+|снова\s+|повторно\s+)?{_RU_ACT_VERBS})"
+    rf"|(?:(?:^|[^\w]){_RU_DONE_VERBS}(?:[^\w]|$))",
+    re.IGNORECASE | re.UNICODE,
 )
 
 TOOL_FAILURE_RE = re.compile(
     r'"error"\s*:\s*true|"success"\s*:\s*false|"status"\s*:\s*"(?:error|failed|failure)"'
     r'|^\s*(?:error|failed|not found|invalid|denied)\b'
     r'|\b(?:was|is) not found\b|\bhas failed\b|\bcould not be\b|\bunable to (?:process|complete)\b',
-    re.IGNORECASE,
+    re.IGNORECASE | re.UNICODE,
 )
 SUCCESS_CLAIM_RE = re.compile(
     r"\b(?:successfully|i(?:'ve| have)\s+(?:now\s+)?(?:cancelled|canceled|booked|updated|"
     r"modified|changed|sent|transferred|refunded|processed|issued|activated|deactivated|"
     r"suspended|resumed|opened|closed|applied|submitted|exchanged|returned|paid|added|removed))"
     r"\b|\b(?:has|have) been (?:successfully )?(?:cancelled|canceled|booked|updated|refunded|"
-    r"processed|completed|confirmed|issued|sent)\b|\byou(?:'re| are) all set\b",
+    r"processed|completed|confirmed|issued|sent)\b|\byou(?:'re| are) all set\b"
+    # Russian
+    rf"|(?:^|[^\w])(?:успешно\s+)?(?:(?:я|мы)\s+(?:уже\s+|ещ[её]\s+)?{_RU_ACT_VERBS})"
+    rf"|(?:(?:^|[^\w]){_RU_DONE_VERBS}(?:[^\w]|$))",
+    re.IGNORECASE | re.UNICODE,
+)
+
+#: Values that are obviously stand-ins rather than real identifiers.
+PLACEHOLDER_RE = re.compile(
+    r"placeholder|lorem\s+ipsum|dummy\s*(?:value|id)|example[\s_-]*(?:value|id|only)|"
+    r"your[\s_-]*(?:value|id|token|api)|changeme|change_me|insert[\s_-]*(?:here|value)|"
+    r"\bfixme\b|\btodo\b|xxxxxxxx|<[a-z][a-z_\- ]{2,30}>|\byour_[a-z_]+\b",
     re.IGNORECASE,
 )
 
@@ -234,6 +292,118 @@ def _iter_response_text(response: ResponseTurn) -> Iterable[str]:
                                     yield v
 
 
+#: Keys under which a wrapper tool carries the *real* tool name it is about to
+#: invoke (discoverable-tool wrappers in banking_knowledge use this shape).
+NESTED_NAME_KEYS = ("agent_tool_name", "tool_name", "target_tool", "discoverable_tool")
+#: Keys under which the nested argument object is stored, usually as a JSON
+#: string rather than as a real nested object.
+NESTED_ARGS_KEYS = ("arguments", "args", "tool_arguments", "parameters", "params")
+
+
+def nested_tool_calls(response: ResponseTurn) -> list[tuple[str, dict]]:
+    """Unwrap discoverable-tool wrappers into ``(tool_name, arguments)`` pairs.
+
+    ``call_discoverable_agent_tool`` takes the *name* of the tool to run and its
+    arguments as a JSON-encoded string. Auditing only the wrapper hides the real
+    call, so the payload is decoded and inspected as if it had been called
+    directly.
+    """
+    found: list[tuple[str, dict]] = []
+
+    def _decode(value: object) -> Optional[dict]:
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, str) and value.strip().startswith("{"):
+            parsed, _ok = lenient_json_loads(value)
+            return parsed if isinstance(parsed, dict) else None
+        return None
+
+    def _walk(args: Optional[dict]) -> None:
+        if not isinstance(args, dict):
+            return
+        for name_key in NESTED_NAME_KEYS:
+            name = args.get(name_key)
+            if not isinstance(name, str) or not name.strip():
+                continue
+            for args_key in NESTED_ARGS_KEYS:
+                if args_key not in args:
+                    continue
+                inner = _decode(args[args_key])
+                if inner is None:
+                    continue
+                found.append((name.strip(), inner))
+                _walk(inner)
+
+    for tc in response.tool_calls:
+        _walk(tc.args)
+    return found
+
+
+def _iter_effective_calls(response: ResponseTurn) -> Iterable[tuple[str, Optional[dict], Optional[str]]]:
+    """Yield ``(tool_name, parsed_args, raw_args)`` for direct and nested calls."""
+    for tc in response.tool_calls:
+        yield _normalise_tool_name(tc.name), tc.args, tc.raw_args
+    for name, inner in nested_tool_calls(response):
+        raw = json.dumps(inner, ensure_ascii=False) if inner else ""
+        yield _normalise_tool_name(name), inner, raw
+
+
+def _iter_arg_strings(args: Optional[dict]) -> Iterable[tuple[str, str]]:
+    """Yield ``(key, value)`` for every scalar argument, flattening lists/dicts."""
+    if not isinstance(args, dict):
+        return
+    for key, value in args.items():
+        if isinstance(value, str):
+            yield key, value
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                if isinstance(item, str):
+                    yield key, item
+                elif isinstance(item, dict):
+                    for sub_key, sub_value in item.items():
+                        if isinstance(sub_value, str):
+                            yield sub_key, sub_value
+        elif isinstance(value, dict):
+            for sub_key, sub_value in value.items():
+                if isinstance(sub_value, str):
+                    yield sub_key, sub_value
+
+
+def check_placeholder_arguments(response: ResponseTurn) -> list[Signal]:
+    """Flag arguments filled with stand-in values such as ``..._placeholder``.
+
+    A real identifier (account id, order id, token) never contains the literal
+    word "placeholder". Such a value is a template the agent shipped instead of
+    looking the real entity up, which the task statement counts as a fabricated
+    entity.
+    """
+    signals: list[Signal] = []
+    seen: set[tuple[str, str]] = set()
+    for name, args, _raw in _iter_effective_calls(response):
+        for key, value in _iter_arg_strings(args):
+            if len(value) < 4:
+                continue
+            m = PLACEHOLDER_RE.search(value)
+            if not m:
+                continue
+            marker = (name, f"{key}={value}")
+            if marker in seen:
+                continue
+            seen.add(marker)
+            signals.append(
+                Signal(
+                    kind="placeholder_argument",
+                    severity="hard",
+                    message=(
+                        f"the call to '{name}' passes the stand-in value "
+                        f"{value!r} for '{key}' instead of a real identifier"
+                    ),
+                    evidence=f"{key}: {value}"[:240],
+                )
+            )
+    return signals
+
+
 # ---------------------------------------------------------------------------
 # Individual checks
 # ---------------------------------------------------------------------------
@@ -249,8 +419,8 @@ def check_tool_availability(
     known = {_normalise_tool_name(n).lower() for n in specs}
     # The catalogue may list a tool family without suffixes; accept exact name
     # or a name that differs only by a numeric suffix pattern.
-    for tc in response.tool_calls:
-        name = _normalise_tool_name(tc.name).lower()
+    for raw_name, _args, _raw_args in _iter_effective_calls(response):
+        name = raw_name.lower()
         if name in known:
             continue
         # Discoverable tools carry a numeric suffix (``open_bank_account_4821``);
@@ -267,10 +437,10 @@ def check_tool_availability(
                 kind="tool_not_available",
                 severity="soft" if mentioned else "hard",
                 message=(
-                    f"the response calls tool '{tc.name}', which is not declared in "
+                    f"the response calls tool '{raw_name}', which is not declared in "
                     "[AVAILABLE TOOLS]"
                 ),
-                evidence=tc.args_preview(240),
+                evidence=(_raw_args or "")[:240],
             )
         )
     return signals
@@ -615,6 +785,8 @@ def compute_signals(
         signals.extend(check_tool_availability(transcript, response, specs))
     if cfg.enable_schema_checks:
         signals.extend(check_tool_arguments(response, specs))
+    if cfg.enable_placeholder_check:
+        signals.extend(check_placeholder_arguments(response))
     if cfg.enable_identifier_grounding:
         severity = "hard" if cfg.identifier_severity == "hard" else "soft"
         signals.extend(check_identifier_grounding(transcript, response, severity))

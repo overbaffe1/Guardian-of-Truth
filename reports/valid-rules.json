@@ -1,0 +1,210 @@
+{
+  "dataset": {
+    "name": "valid.parquet (public labelled slice committed to the repo)",
+    "rows": 46,
+    "positives": 23,
+    "negatives": 23,
+    "note": "This is a 46-row balanced slice, NOT the full 548-row public split."
+  },
+  "response_language": {
+    "ru": 28,
+    "en": 18,
+    "note": "Policies are English; ~61% of agent responses are Russian."
+  },
+  "rule_stage": {
+    "hard_only": {
+      "n": 2,
+      "tp": 2,
+      "fp": 0,
+      "precision": 1.0,
+      "recall": 0.087,
+      "f1": 0.16,
+      "coverage": 0.0435
+    },
+    "any_signal": {
+      "n": 15,
+      "tp": 12,
+      "fp": 3,
+      "precision": 0.8,
+      "recall": 0.5217,
+      "f1": 0.6316,
+      "coverage": 0.3261
+    }
+  },
+  "signals": {
+    "tool_not_available": {
+      "n": 6,
+      "precision": 1.0,
+      "recall_of_positives": 0.2609,
+      "coverage": 0.1304,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "banking_knowledge": 2,
+        "telecom": 4
+      }
+    },
+    "possible_false_refusal": {
+      "n": 3,
+      "precision": 0.3333,
+      "recall_of_positives": 0.0435,
+      "coverage": 0.0652,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "airline": 1,
+        "banking_knowledge": 1,
+        "retail": 1
+      }
+    },
+    "action_targets_unrequested_entity": {
+      "n": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.087,
+      "coverage": 0.0435,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "retail": 1,
+        "telecom": 1
+      }
+    },
+    "duplicate_tool_call": {
+      "n": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.087,
+      "coverage": 0.0435,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "retail": 1,
+        "telecom": 1
+      }
+    },
+    "ungrounded_number": {
+      "n": 1,
+      "precision": 0.0,
+      "recall_of_positives": 0.0,
+      "coverage": 0.0217,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "airline": 1
+      }
+    },
+    "invalid_tool_arguments": {
+      "n": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.0435,
+      "coverage": 0.0217,
+      "hard": true,
+      "hard_fraction": 1.0,
+      "hard_precision": 1.0,
+      "domains": {
+        "airline": 1
+      }
+    },
+    "missing_confirmation": {
+      "n": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.0435,
+      "coverage": 0.0217,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "airline": 1
+      }
+    },
+    "placeholder_argument": {
+      "n": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.0435,
+      "coverage": 0.0217,
+      "hard": true,
+      "hard_fraction": 1.0,
+      "hard_precision": 1.0,
+      "domains": {
+        "banking_knowledge": 1
+      }
+    },
+    "claimed_action_without_tool_call": {
+      "n": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.0435,
+      "coverage": 0.0217,
+      "hard": false,
+      "hard_fraction": 0.0,
+      "hard_precision": null,
+      "domains": {
+        "retail": 1
+      }
+    }
+  },
+  "by_domain": {
+    "airline": {
+      "n": 12,
+      "pos": 6,
+      "hard": 1,
+      "hard_tp": 1,
+      "any": 4,
+      "any_tp": 2,
+      "hard_precision": 1.0,
+      "any_precision": 0.5
+    },
+    "banking_knowledge": {
+      "n": 11,
+      "pos": 6,
+      "hard": 1,
+      "hard_tp": 1,
+      "any": 3,
+      "any_tp": 2,
+      "hard_precision": 1.0,
+      "any_precision": 0.6667
+    },
+    "retail": {
+      "n": 11,
+      "pos": 5,
+      "hard": 0,
+      "hard_tp": 0,
+      "any": 3,
+      "any_tp": 3,
+      "hard_precision": null,
+      "any_precision": 1.0
+    },
+    "telecom": {
+      "n": 12,
+      "pos": 6,
+      "hard": 0,
+      "hard_tp": 0,
+      "any": 5,
+      "any_tp": 5,
+      "hard_precision": null,
+      "any_precision": 1.0
+    }
+  },
+  "judge_workload": {
+    "positives_without_hard_signal": 21,
+    "positives_without_any_signal": 11,
+    "positives": 23
+  },
+  "evidence_packing": {
+    "max_chars": 30000,
+    "context_chars_median": 20570,
+    "context_chars_max": 29915,
+    "rows_over_budget": 0,
+    "policy_retention_by_domain": {
+      "airline": 1.0,
+      "banking_knowledge": 1.0,
+      "retail": 1.0,
+      "telecom": 0.836
+    },
+    "response_identifiers_lost": 8,
+    "response_identifiers_total": 312
+  }
+}

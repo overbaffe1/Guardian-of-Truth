@@ -51,6 +51,31 @@ Ask: "Would this detail or action change the outcome, or the data the user sees?
 If yes, or potentially yes -> label 1. If it is clearly cosmetic and can never change
 the outcome -> label 0.
 
+# LANGUAGE
+Most transcripts in this corpus are written in Russian. The RESPONSE language may also
+differ from the CONTEXT language. Judge meaning, never wording: a Russian restatement of
+an English tool result is grounded when the facts match, and a mismatch is still a
+contradiction across languages. Translate both sides mentally before comparing.
+
+# COMMON UNSUPPORTED PATTERNS (search for these explicitly)
+These account for most of the errors that surface-level reading misses:
+- Asking the user for information that is ALREADY in the context: a field a tool already
+  returned, or a detail the user gave earlier in the dialogue.
+- Computing over the WRONG SUBSET: adding past, cancelled, expired or unrelated records when
+  the user asked for upcoming/active/current ones, or dropping a record that belongs, which
+  makes a total or count wrong even when every individual number is copied correctly.
+- Deriving a field from an UNRELATED field: taking digits out of an email address and
+  passing them as a postal code, reusing one entity's id as a different kind of id.
+- Passing a PLACEHOLDER or template value as if it were real: strings containing
+  "placeholder", "example", "your_value", or otherwise obviously fabricated.
+- Escalating to a human, or refusing, while obvious available steps remain: a tool from
+  [AVAILABLE TOOLS] that was never used, a mandatory check from the policy or a
+  knowledge-base document that was never completed, or a request the tools can serve.
+- Narrating an action as COMPLETED in the text while this turn contains no matching tool
+  call, or while the tool output reported an error.
+- Acting on an entity the user did not ask about: modifying a different reservation, order,
+  account or profile than the one under discussion.
+
 # PRECISION RULES (avoid false alarms)
 - Generic helpful phrasing without specific facts ("I can help with that", "Let me check",
   "Thanks for waiting") is NOT a hallucination.
@@ -134,6 +159,16 @@ statuses, promised actions) quote the exact context line that supports it. If yo
 find a supporting line, the claim is UNSUPPORTED. If a line says something different, the
 claim is CONTRADICTED. Then apply the decision test: would this detail or action change the
 outcome, or the data the user sees? Only then choose label 1.
+
+The transcript is usually in Russian and the RESPONSE may be in another language: compare
+meaning across languages, and treat a faithful translation as grounded.
+
+Spend your effort on the patterns that survive a casual read: asking for information that is
+already in the context, aggregating over the wrong subset (past/cancelled records mixed into
+an "upcoming/active/current" answer), a field derived from an unrelated one (digits of an
+email used as a postal code), a placeholder or fabricated identifier passed to a tool,
+escalating or refusing while an available tool or a mandatory check is still unused, and
+actions narrated as completed without a matching tool call.
 
 # OUTPUT
 Return ONLY a JSON object, no markdown, no text before or after:
