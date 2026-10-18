@@ -1,0 +1,9 @@
+runner: Linux 6.17.0-1022-azure x86_64, cores=4
+disk: 86G free
+python: Python 3.12.3
+gpu: none
+--- network ---
+200 https://huggingface.co
+403 https://gv02-dsworks-obs01.obs.ru-moscow-1.hc.sbercloud.ru
+200 https://pypi.org
+200 https://github.com
