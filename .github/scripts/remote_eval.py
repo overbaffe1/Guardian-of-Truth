@@ -22,6 +22,7 @@ import hashlib
 import json
 import sys
 import time
+import traceback
 import zipfile
 from pathlib import Path
 from typing import Any, Optional
@@ -210,6 +211,30 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+def _load_rows(path: Path) -> list[Any]:
+    from guardian.io_utils import read_table
+
+    try:
+        return read_table(str(path))
+    except Exception:
+        # A plain JSON document (e.g. a model config.json) is not a dataset.
+        if path.suffix.lower() == ".json":
+            data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+            return data if isinstance(data, list) else []
+        raise
+
+
+def _guarded(report: dict, stage: str, func, *args):
+    """Run a stage, recording a traceback instead of failing the whole report."""
+    try:
+        return func(*args)
+    except Exception:
+        report.setdefault("errors", []).append(
+            {"stage": stage, "traceback": traceback.format_exc()[-2000:]}
+        )
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     started = time.monotonic()
     args = parse_args(argv)
@@ -230,17 +255,25 @@ def main(argv: list[str] | None = None) -> int:
             report["file"] = {**report["file"], **file_fingerprint(target)}
 
     if target.suffix.lower() in TABLE_SUFFIXES:
-        from guardian.io_utils import read_table
-
-        rows = read_table(str(target))
-        if args.limit and args.limit > 0:
-            rows = rows[: args.limit]
-        report["dataset"] = dataset_stats(rows)
-        has_labels = all(isinstance(r.get("label"), (int, float)) for r in rows)
-        if not args.no_signals:
-            signals, metrics, _ = signal_report(rows, has_labels)
-            report["signals"] = signals
-            report["heuristic"] = metrics
+        try:
+            rows = _load_rows(target)
+            if not rows or not isinstance(rows[0], dict):
+                report["note"] = "file parsed but does not look like a table of rows"
+            else:
+                if args.limit and args.limit > 0:
+                    rows = rows[: args.limit]
+                report["dataset"] = _guarded(report, "dataset", dataset_stats, rows)
+                has_labels = all(isinstance(r.get("label"), (int, float)) for r in rows)
+                if not args.no_signals:
+                    result = _guarded(report, "signals", signal_report, rows, has_labels)
+                    if result:
+                        signals, metrics, _ = result
+                        report["signals"] = signals
+                        report["heuristic"] = metrics
+        except Exception:
+            report.setdefault("errors", []).append(
+                {"stage": "table", "traceback": traceback.format_exc()[-2000:]}
+            )
     else:
         report["note"] = "downloaded file is not a table; only metadata was collected"
 

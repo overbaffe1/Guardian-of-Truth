@@ -52,6 +52,7 @@ jobs:
       TARGET_LABEL: ${{ github.event.client_payload.label || inputs.label || 'dataset' }}
       TARGET_LIMIT: ${{ github.event.client_payload.limit || inputs.limit || '0' }}
       STORE_RAW: ${{ github.event.client_payload.store_raw || inputs.store_raw || 'false' }}
+      REPORT_BRANCH: arena/ff28bb09-guardian-of-truth
     steps:
       - uses: actions/checkout@v4
         with:
@@ -135,8 +136,8 @@ jobs:
           fi
           git commit -m "remote-eval: ${TARGET_LABEL} [skip ci]"
           for attempt in 1 2 3; do
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && \
-              git push origin "HEAD:${GITHUB_REF_NAME}" && break
+            git pull --rebase --autostash origin "${REPORT_BRANCH}" && \
+              git push origin "HEAD:${REPORT_BRANCH}" && break
             echo "push attempt $attempt failed, retrying"
             sleep 5
           done
