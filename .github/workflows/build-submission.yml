@@ -14,6 +14,11 @@ name: build-submission
 # committed: model weights must never enter the repository history. Only a
 # small status report is committed, because the sandbox cannot read job logs
 # either -- the outcome has to travel through the repo.
+#
+# The build is one step with plain bash branching on purpose. Step-level
+# conditions referencing `steps.<id>.outputs` made GitHub reject the whole file
+# (a zero-job run named after the path), which is very hard to diagnose from the
+# outside.
 
 on:
   repository_dispatch:
@@ -39,8 +44,8 @@ jobs:
     env:
       MODEL_ID: ${{ github.event.client_payload.model_id || inputs.model_id || 'Qwen/Qwen2.5-14B-Instruct-AWQ' }}
       REPORT_BRANCH: ${{ github.event.client_payload.report_branch || github.ref_name }}
-      HF_HOME: /tmp/hf_cache
       REPORT_PATH: reports/build-status.json
+      HF_HOME: /tmp/hf_cache
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,26 +56,29 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Record runner capacity
-        run: |
-          set -uo pipefail
-          df -h / | tail -1
-          FREE=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-          echo "free_before=$FREE"
-          mkdir -p reports
-          printf '{"stage":"probe","free_gb":%s,"model_id":"%s"}\n' "$FREE" "$MODEL_ID" > "$REPORT_PATH"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install huggingface_hub pandas pyarrow
 
-      - name: Download judge weights
-        id: dl
+      - name: Build, verify and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
+          cd "$GITHUB_WORKSPACE"
+          mkdir -p "$(dirname "$REPORT_PATH")"
+          status() { python3 -c "import json,sys; json.dump(json.loads(sys.argv[1]), open(sys.argv[2],'w'), indent=2)" "$1" "$REPORT_PATH"; }
+          fail() { status "$1"; echo "::error::$1"; exit 1; }
+
+          df -h / | tail -1
+          FREE_BEFORE=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          echo "free before download: ${FREE_BEFORE} GB"
+          status "{\"stage\":\"probe\",\"free_gb\":$FREE_BEFORE,\"model_id\":\"$MODEL_ID\"}"
+
+          # ---- fetch the weights -------------------------------------------
           mkdir -p model
-          python - <<'PY'
+          if ! python3 - <<'PY'
           import os
           from huggingface_hub import snapshot_download
           snapshot_download(
@@ -79,103 +87,82 @@ jobs:
               allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],
               max_workers=4,
           )
-          print("download finished")
           PY
+          then
+            fail '{"stage":"download_failed"}'
+          fi
           # snapshot_download keeps a second copy under model/.cache and
-          # $HF_HOME; both would double the disk peak for no benefit.
+          # HF_HOME; both would double the disk peak for no benefit.
           rm -rf model/.cache /tmp/hf_cache
           MODEL_MB=$(du -sm model | cut -f1)
-          FREE_MB=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
           MODEL_GB=$(( MODEL_MB / 1024 + 1 ))
-          FREE_GB=$(( FREE_MB / 1024 ))
-          # The zip needs room for the model plus a second copy of it.
-          if [ $(( MODEL_GB + 4 )) -gt "$FREE_GB" ]; then LOW=true; else LOW=false; fi
-          echo "model_gb=$MODEL_GB" >> "$GITHUB_OUTPUT"
-          echo "free_after=$FREE_GB" >> "$GITHUB_OUTPUT"
-          echo "low_disk=$LOW" >> "$GITHUB_OUTPUT"
-          echo "model=${MODEL_MB} MB, free after download=${FREE_GB} GB"
+          FREE_AFTER=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          echo "model: ${MODEL_MB} MB, free now: ${FREE_AFTER} GB"
           ls model
-          du -sh model
 
-      - name: Publish the weights directly (low-disk fallback)
-        id: weights_only
-        # Building submission.zip needs room for the model *and* a second copy
-        # of it inside the archive. When that does not fit, ship the weights as
-        # release assets and let the participant build the archive locally,
-        # which needs no extra disk.
-        id: weights_only
-        if: ${{ steps.dl.outputs.low_disk == 'true' }}
-        run: |
-          set -euo pipefail
-          cd "$GITHUB_WORKSPACE"
-          TAG="weights-$(date +%Y%m%d-%H%M)"
-          rm -rf weights_parts && mkdir -p weights_parts && cd weights_parts
-          for f in ../model/*; do
-            split -b 1900M -d -a 2 "$f" "$(basename "$f").part."
-          done
-          ls -lh
-          sha256sum *.part.* > sha256.txt
-          {
-            echo "# Weights for the judge: ${MODEL_ID}"
-            echo
-            echo "Reassemble every part into model/, then build the archive:"
-            echo '```bash'
-            echo "python scripts/make_submission.py --model model --out submission.zip"
-            echo '```'
-            echo
-            echo "## sha256 of the parts"
-            echo '```'
-            cat sha256.txt
-            echo '```'
-          } > README.md
-          gh release create "$TAG" ./*.part.* sha256.txt README.md \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Guardian of Truth weights $TAG" --notes "Judge weights for ${MODEL_ID}"
-          python - <<PY
-          import json
-          json.dump({"stage": "weights_only", "tag": "$TAG",
-                     "model_gb": int("${{ steps.dl.outputs.model_gb }}"),
-                     "note": "not enough disk for the zip; build it locally"},
-                    open("$GITHUB_WORKSPACE/$REPORT_PATH", "w"), indent=2)
-          PY
+          NEED=$(( MODEL_GB + 4 ))
 
-      - name: Build archive
-        if: ${{ steps.weights_only.outcome != 'success' }}
-        run: |
-          set -euo pipefail
-          python scripts/make_submission.py --model model --out submission.zip
+          # ---- not enough room for the zip: ship the weights ---------------
+          if [ "$FREE_AFTER" -lt "$NEED" ]; then
+            echo "not enough disk for the archive; publishing the weights instead"
+            TAG="weights-$(date +%Y%m%d-%H%M)"
+            rm -rf weights_parts && mkdir -p weights_parts
+            for f in model/*; do
+              split -b 1900M -d -a 2 "$f" "weights_parts/$(basename "$f").part."
+            done
+            ( cd weights_parts && sha256sum ./*.part.* > sha256.txt )
+            {
+              echo "# Weights for the judge: $MODEL_ID"
+              echo
+              echo "Reassemble the parts into model/, then build the archive:"
+              echo '```bash'
+              echo "python scripts/make_submission.py --model model --out submission.zip"
+              echo '```'
+              echo
+              echo "## sha256 of the parts"
+              echo '```'
+              cat weights_parts/sha256.txt
+              echo '```'
+            } > weights_parts/README.md
+            if ! gh release create "$TAG" weights_parts/*.part.* weights_parts/sha256.txt weights_parts/README.md \
+                 --repo "$GITHUB_REPOSITORY" --title "Guardian of Truth weights $TAG" \
+                 --notes "Judge weights for $MODEL_ID"; then
+              fail "{\"stage\":\"release_failed\",\"tag\":\"$TAG\"}"
+            fi
+            status "{\"stage\":\"weights_only\",\"tag\":\"$TAG\",\"model_gb\":$MODEL_GB,\"free_gb\":$FREE_AFTER,\"note\":\"not enough disk for the zip; build it locally\"}"
+            exit 0
+          fi
+
+          # ---- build the archive -------------------------------------------
+          if ! python3 scripts/make_submission.py --model model --out submission.zip; then
+            fail "{\"stage\":\"build_failed\",\"model_gb\":$MODEL_GB,\"free_gb\":$FREE_AFTER}"
+          fi
           ls -lh submission.zip
           rm -rf model
+          df -h / | tail -1
 
-      - name: Verify archive
-        if: ${{ steps.weights_only.outcome != 'success' }}
-        run: |
-          set -euo pipefail
-          unzip -t submission.zip | tail -2
+          # ---- verify -------------------------------------------------------
+          unzip -t submission.zip | tail -2 || fail '{"stage":"zip_corrupt"}'
           for f in README.md pyproject.toml scripts/predict.py; do
-            unzip -l submission.zip "$f" | grep -q "$f" || { echo "MISSING $f"; exit 1; }
-            echo "ok: $f"
+            unzip -l submission.zip "$f" | grep -q "$f" || fail "{\"stage\":\"missing_entry\",\"entry\":\"$f\"}"
           done
           if unzip -l submission.zip | grep -q "metrics/"; then
-            echo "metrics/ must not be shipped"; exit 1
+            fail '{"stage":"metrics_dir_present"}'
           fi
-          echo "no metrics/: ok"
           N=$(unzip -l submission.zip | grep -c "model/.*safetensors" || true)
-          echo "weight shards in archive: $N"
-          if [ "$N" -lt 1 ]; then echo "no weights in archive"; exit 1; fi
+          if [ "$N" -lt 1 ]; then fail '{"stage":"no_weights_in_archive"}'; fi
+          echo "entries ok, weight shards: $N"
           unzip -l submission.zip | head -20
 
-      - name: Smoke test the entrypoint
-        if: ${{ steps.weights_only.outcome != 'success' }}
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
-          unzip -q "$GITHUB_WORKSPACE/submission.zip"
-          # No GPU on the runner: this exercises the import path, the entrypoint
-          # and the output format, which is what the platform calls.
-          python scripts/predict.py --input "$GITHUB_WORKSPACE/valid.parquet" --output /tmp/smoke/pred.csv
+          # ---- smoke test the entrypoint the platform calls ------------------
+          rm -rf /tmp/smoke && mkdir -p /tmp/smoke
+          ( cd /tmp/smoke && unzip -q "$GITHUB_WORKSPACE/submission.zip" )
+          if ! ( cd /tmp/smoke && python3 scripts/predict.py \
+                   --input "$GITHUB_WORKSPACE/valid.parquet" --output /tmp/smoke/pred.csv ); then
+            fail '{"stage":"entrypoint_failed"}'
+          fi
           head -c 4 /tmp/smoke/pred.csv
-          python - <<'PY'
+          python3 - <<'PY' || fail '{"stage":"entrypoint_output_invalid"}'
           import pandas as pd
           d = pd.read_parquet("/tmp/smoke/pred.csv")
           src = pd.read_parquet("valid.parquet")
@@ -186,17 +173,11 @@ jobs:
           print("entrypoint OK:", len(d), "rows, positive rate", round(d.label.mean(), 3))
           PY
 
-      - name: Split and publish to a Release
-        if: ${{ steps.weights_only.outcome != 'success' }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          cd "$GITHUB_WORKSPACE"
+          # ---- publish ------------------------------------------------------
           TAG="submission-$(date +%Y%m%d-%H%M)"
           split -b 1900M -d -a 2 submission.zip submission.part.
           PARTS=$(ls submission.part.* | wc -l)
-          sha256sum submission.zip | cut -d' ' -f1 > submission.sha256
+          SHA256=$(sha256sum submission.zip | cut -d' ' -f1)
           {
             echo "# Guardian of Truth: ready-to-upload archive"
             echo
@@ -207,24 +188,20 @@ jobs:
             echo "cat submission.part.* > submission.zip"
             echo '```'
             echo
-            echo "Judge model: \`${MODEL_ID}\`. Upload \`submission.zip\` afterwards."
+            echo "Judge model: \`$MODEL_ID\`. Upload \`submission.zip\` afterwards."
             echo
             echo "## sha256 of the parts"
             echo '```'
             sha256sum submission.part.*
             echo '```'
           } > submission.README.md
-          gh release create "$TAG" submission.part.* submission.sha256 submission.README.md \
-            --repo "$GITHUB_REPOSITORY" --title "Guardian of Truth submission $TAG" \
-            --notes "Built and verified on a GitHub runner."
-          python - <<PY
-          import json, os
-          json.dump({"stage": "published", "tag": "$TAG", "parts": $PARTS,
-                     "sha256": open("submission.sha256").read().strip(),
-                     "archive_bytes": os.path.getsize("submission.zip"),
-                     "model_id": os.environ["MODEL_ID"]},
-                    open("$GITHUB_WORKSPACE/$REPORT_PATH", "w"), indent=2)
-          PY
+          if ! gh release create "$TAG" submission.part.* submission.README.md \
+               --repo "$GITHUB_REPOSITORY" --title "Guardian of Truth submission $TAG" \
+               --notes "Built and verified on a GitHub runner."; then
+            fail "{\"stage\":\"release_failed\",\"tag\":\"$TAG\"}"
+          fi
+          status "{\"stage\":\"published\",\"tag\":\"$TAG\",\"parts\":$PARTS,\"sha256\":\"$SHA256\",\"archive_bytes\":$(stat -c%s submission.zip),\"model_id\":\"$MODEL_ID\"}"
+          echo "published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
 
       - name: Commit the build report
         if: always()
@@ -233,7 +210,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           mkdir -p "$(dirname "$REPORT_PATH")"
-          python - <<PY || true
+          python3 - <<PY || true
           import json, os
           path = os.environ["REPORT_PATH"]
           data = {}
