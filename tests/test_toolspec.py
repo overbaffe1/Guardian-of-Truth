@@ -96,3 +96,10 @@ def test_numeric_string_is_tolerated():
     specs = extract_available_tools(TEXT_SYSTEM)
     spec = specs["search_knowledge_base"]
     assert validate_tool_call(spec, {"query": "x", "top_k": "5"}) == []
+
+
+def test_spec_source_tracks_parser():
+    json_specs = extract_available_tools(JSON_SYSTEM)
+    text_specs = extract_available_tools(TEXT_SYSTEM)
+    assert json_specs["get_user_details"].source == "json"
+    assert text_specs["search_knowledge_base"].source == "text"

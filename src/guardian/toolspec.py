@@ -40,6 +40,9 @@ class ToolSpec:
     description: str = ""
     params: dict[str, ParamSpec] = field(default_factory=dict)
     additional_properties: Optional[bool] = None
+    #: how the spec was obtained: "json" (trustworthy schemas) or "text"
+    #: (best-effort regex parsing; argument checks are only hints then)
+    source: str = "text"
 
     def brief(self, max_desc: int = 100) -> str:
         desc = " ".join((self.description or "").split())
@@ -113,6 +116,7 @@ def _spec_from_json_schema(obj: dict[str, Any], fallback_name: str = "") -> Opti
         description=str(obj.get("description", ""))[:500],
         params=params,
         additional_properties=add_props if isinstance(add_props, bool) else None,
+        source="json",
     )
 
 
@@ -166,7 +170,7 @@ def _parse_json_catalogue(block: str) -> dict[str, ToolSpec]:
             continue
         for item in items:
             if isinstance(item, str):
-                _add_spec(specs, ToolSpec(name=item))
+                _add_spec(specs, ToolSpec(name=item, source="json"))
             elif isinstance(item, dict):
                 spec = _spec_from_json_schema(item)
                 if spec:

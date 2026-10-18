@@ -205,3 +205,31 @@ def test_success_claim_after_recovered_error_is_fine():
     )
     signals = compute_signals(t, r, specs)
     assert "claimed_success_after_tool_error" not in kinds(signals)
+
+
+def test_unavailable_tool_mentioned_in_context_is_soft():
+    t, r, specs = build(
+        "⟦USER⟧\ncan you use issue_full_refund for me?\n⟦ASSISTANT · ход 1⟧\nlet me check\n",
+        '⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL issue_full_refund: {"amount": 100}',
+    )
+    signals = compute_signals(t, r, specs)
+    assert "tool_not_available" in kinds(signals, "soft")
+    assert "tool_not_available" not in kinds(signals, "hard")
+
+
+def test_text_schema_violation_is_only_soft():
+    system = (
+        "⟦SYSTEM⟧\nYou are a banking agent.\n[AVAILABLE TOOLS]\n"
+        "Tool: open_bank_account_4821\nDescription: Open an account.\nParameters:\n"
+        "  - customer_id: string (required) - customer id\n"
+        "  - account_class: string (required) - class name\n"
+    )
+    t, r, specs = build(
+        "⟦USER⟧\ncustomer C1001 wants a new account, class standard\n"
+        "⟦ASSISTANT · ход 1⟧\nchecking\n",
+        '⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL open_bank_account_4821: {"customer_id": "C1001"}',
+        domain_system=system,
+    )
+    signals = compute_signals(t, r, specs)
+    assert "invalid_tool_arguments" in kinds(signals, "soft")
+    assert "invalid_tool_arguments" not in kinds(signals, "hard")

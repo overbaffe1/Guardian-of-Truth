@@ -133,3 +133,30 @@ def test_policy_tag_mentioned_in_prose_is_ignored():
     policy = extract_policy(parse_transcript(system).system_text)
     assert policy.startswith("# Real Policy")
     assert "Follow the" not in policy
+
+
+def test_plain_role_lines_are_parsed():
+    prompt = (
+        "System: You are a retail agent.\n"
+        "<policy>\nConfirm before exchanging items.\n</policy>\n\n"
+        "User: I want to exchange the lamp in order #W1234567.\n\n"
+        "Assistant: Sure, which colour?\n"
+    )
+    transcript = parse_transcript(prompt)
+    assert transcript.system_text.startswith("You are a retail agent.")
+    assert any(e.kind == "user" and "exchange the lamp" in e.content for e in transcript.events)
+    assert any(e.kind == "assistant" for e in transcript.events)
+
+
+def test_plain_tool_lines_are_parsed():
+    prompt = (
+        "System: agent\nUser: check order #W1234567\nAssistant: one moment\n"
+        'TOOL_CALL get_order_details: {"order_id": "#W1234567"}\n'
+        'TOOL_RESPONSE get_order_details: {"order_id": "#W1234567", "status": "pending"}\n'
+        "Assistant: it is pending\n"
+    )
+    transcript = parse_transcript(prompt)
+    assert len(transcript.tool_calls) == 1
+    assert transcript.tool_calls[0].tool_call.name == "get_order_details"
+    assert transcript.tool_calls[0].tool_call.args == {"order_id": "#W1234567"}
+    assert len(transcript.tool_responses) == 1

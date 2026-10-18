@@ -44,6 +44,14 @@ TOOL_RESP_BARE_RE = re.compile(
 
 _TURN_RE = re.compile(r"(?:ход|turn|step)\s*(\d+)", re.IGNORECASE)
 
+# Fallback for renderers that use plain ``Role:`` lines instead of ⟦…⟧ markers.
+PLAIN_ROLE_RE = re.compile(
+    r"^[ \t]*[\[(]?[ \t]*"
+    r"(SYSTEM|USER|HUMAN|CUSTOMER|CLIENT|ASSISTANT|AGENT|BOT|TOOL[ _]?(?:CALL|RESPONSE|RESULT)?)"
+    r"[ \t]*[\])]?[ \t]*[:：][ \t]?",
+    re.IGNORECASE | re.MULTILINE,
+)
+
 DOMAIN_HINTS = {
     "banking_knowledge": (
         "rho-bank", "rho bank", "bank account", "credit card", "debit card",
@@ -210,6 +218,29 @@ def parse_transcript(text: str) -> Transcript:
 
     matches = list(MARKER_RE.finditer(raw))
     if not matches:
+        plain = list(PLAIN_ROLE_RE.finditer(raw))
+        if len(plain) >= 2:
+            # ``System: … User: … Assistant: …`` layout.
+            matches = plain
+            preamble = raw[: matches[0].start()].strip()
+            if len(preamble) > 40:
+                events.append(Event(kind="system", content=preamble, order=order))
+                order += 1
+            for idx, m in enumerate(matches):
+                role = _classify_marker(m.group(1))[0]
+                content_end = matches[idx + 1].start() if idx + 1 < len(matches) else len(raw)
+                content = raw[m.end() : content_end]
+                if role in ("assistant", "other"):
+                    order = _append_assistant_segment(events, content, None, order)
+                elif content.strip():
+                    events.append(Event(kind=role, content=content.strip(), order=order))
+                    order += 1
+            transcript = Transcript(events=events, raw=raw, system_text="")
+            transcript.system_text = "\n\n".join(
+                e.content for e in transcript.events if e.kind == "system"
+            )
+            transcript.domain = detect_domain(transcript)
+            return transcript
         # No markers at all: keep the whole prompt as system context.
         events.append(Event(kind="system", content=raw.strip(), order=0))
     else:

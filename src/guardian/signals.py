@@ -240,11 +240,12 @@ def _iter_response_text(response: ResponseTurn) -> Iterable[str]:
 
 
 def check_tool_availability(
-    response: ResponseTurn, specs: dict[str, ToolSpec]
+    transcript: Transcript, response: ResponseTurn, specs: dict[str, ToolSpec]
 ) -> list[Signal]:
     if not specs:
         return []
     signals: list[Signal] = []
+    context_low = (transcript.raw or "").lower()
     known = {_normalise_tool_name(n).lower() for n in specs}
     # The catalogue may list a tool family without suffixes; accept exact name
     # or a name that differs only by a numeric suffix pattern.
@@ -257,10 +258,14 @@ def check_tool_availability(
         base = re.sub(r"_\d{2,6}$", "", name)
         if base in known:
             continue
+        # A name that is mentioned somewhere in the context (e.g. in the
+        # dialogue or in a catalogue layout we failed to parse) is weaker
+        # evidence: downgrade it to a hint for the judge.
+        mentioned = name in context_low or (bool(base) and base in context_low)
         signals.append(
             Signal(
                 kind="tool_not_available",
-                severity="hard",
+                severity="soft" if mentioned else "hard",
                 message=(
                     f"the response calls tool '{tc.name}', which is not declared in "
                     "[AVAILABLE TOOLS]"
@@ -299,11 +304,14 @@ def check_tool_arguments(
                 )
             )
             continue
+        # Argument checks are only authoritative for real JSON schemas; a
+        # best-effort text parse may mislabel optional fields as required.
+        severity = "hard" if getattr(spec, "source", "text") == "json" else "soft"
         for issue in validate_tool_call(spec, tc.args):
             signals.append(
                 Signal(
                     kind="invalid_tool_arguments",
-                    severity="hard",
+                    severity=severity,
                     message=f"tool '{tc.name}': {issue}",
                     evidence=tc.args_preview(240),
                 )
@@ -601,7 +609,7 @@ def compute_signals(
     signals: list[Signal] = []
 
     if cfg.enable_tool_availability:
-        signals.extend(check_tool_availability(response, specs))
+        signals.extend(check_tool_availability(transcript, response, specs))
     if cfg.enable_schema_checks:
         signals.extend(check_tool_arguments(response, specs))
     if cfg.enable_identifier_grounding:
