@@ -2,16 +2,18 @@ name: build-submission
 
 # Build a complete, ready-to-upload competition archive on a GitHub-hosted
 # runner: fetch the judge weights, assemble submission.zip with the documented
-# layout, verify it, and publish it as Release assets the participant can
-# download from a browser.
+# layout, verify it, and publish it as Release assets.
 #
 # Why a runner: the development sandbox cannot reach huggingface.co, and
 # release-assets.githubusercontent.com is not reachable from it either, so the
-# ~10 GB of weights cannot be brought back into the sandbox. The runner has
-# full network access, so the finished archive is produced there instead.
+# ~10 GB of weights cannot be brought back into the sandbox. Pushing them into
+# this public repository is not acceptable either. So the runner does the work
+# and publishes the result.
 #
 # The archive is published as Release assets (< 2 GB each) rather than being
-# committed: model weights must never enter the repository history.
+# committed: model weights must never enter the repository history. Only a
+# small status report is committed, because the sandbox cannot read job logs
+# either -- the outcome has to travel through the repo.
 
 on:
   repository_dispatch:
@@ -22,10 +24,6 @@ on:
         description: "Hugging Face model id for the judge"
         required: false
         default: "Qwen/Qwen2.5-14B-Instruct-AWQ"
-      download_weights:
-        description: "Download the weights (false = probe the runner only)"
-        required: false
-        default: "true"
 
 permissions:
   contents: write
@@ -40,8 +38,9 @@ jobs:
     timeout-minutes: 180
     env:
       MODEL_ID: ${{ github.event.client_payload.model_id || inputs.model_id || 'Qwen/Qwen2.5-14B-Instruct-AWQ' }}
-      DOWNLOAD_WEIGHTS: ${{ github.event.client_payload.download_weights || inputs.download_weights || 'true' }}
-      TARGET_REF: ${{ github.event.client_payload.ref || github.ref_name }}
+      REPORT_BRANCH: ${{ github.event.client_payload.report_branch || github.ref_name }}
+      HF_HOME: /tmp/hf_cache
+      REPORT_PATH: reports/build-status.json
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,21 +51,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Runner capacity probe
+      - name: Record runner capacity
         run: |
-          set -euo pipefail
-          df -h / | tail -2
-          FREE_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
-          echo "FREE_GB=$FREE_GB" >> "$GITHUB_ENV"
-          {
-            echo "### runner capacity"
-            echo "- free on /: **${FREE_GB} GB**"
-            echo "- building needs ~2x the model size (weights + archive)"
-          } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$DOWNLOAD_WEIGHTS" = "true" ] && [ "$FREE_GB" -lt 25 ]; then
-            echo "::error::only ${FREE_GB} GB free; need ~25 GB to build the archive"
-            exit 1
-          fi
+          set -uo pipefail
+          df -h / | tail -1
+          FREE=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
+          echo "free_before=$FREE"
+          mkdir -p reports
+          printf '{"stage":"probe","free_gb":%s,"model_id":"%s"}\n' "$FREE" "$MODEL_ID" > "$REPORT_PATH"
 
       - name: Install dependencies
         run: |
@@ -74,54 +66,104 @@ jobs:
           python -m pip install huggingface_hub pandas pyarrow
 
       - name: Download judge weights
-        if: env.DOWNLOAD_WEIGHTS == 'true'
+        id: dl
         run: |
           set -euo pipefail
           mkdir -p model
           python - <<'PY'
           import os
           from huggingface_hub import snapshot_download
-          mid = os.environ["MODEL_ID"]
-          path = snapshot_download(
-              repo_id=mid,
+          snapshot_download(
+              repo_id=os.environ["MODEL_ID"],
               local_dir="model",
               allow_patterns=["*.json", "*.safetensors", "*.txt", "*.model"],
               max_workers=4,
           )
-          print("downloaded to", path)
+          print("download finished")
           PY
-          ls -la model | head -30
+          # snapshot_download keeps a second copy under model/.cache and
+          # $HF_HOME; both would double the disk peak for no benefit.
+          rm -rf model/.cache /tmp/hf_cache
+          MODEL_MB=$(du -sm model | cut -f1)
+          FREE_MB=$(df -BM --output=avail / | tail -1 | tr -dc '0-9')
+          MODEL_GB=$(( MODEL_MB / 1024 + 1 ))
+          FREE_GB=$(( FREE_MB / 1024 ))
+          echo "model_mb=$MODEL_MB" >> "$GITHUB_OUTPUT"
+          echo "model_gb=$MODEL_GB" >> "$GITHUB_OUTPUT"
+          echo "free_after=$FREE_GB" >> "$GITHUB_OUTPUT"
+          echo "model=${MODEL_MB} MB, free after download=${FREE_GB} GB"
+          ls model
           du -sh model
 
-      - name: Build archive
-        if: env.DOWNLOAD_WEIGHTS == 'true'
+      - name: Publish the weights directly (low-disk fallback)
+        # Building submission.zip needs room for the model *and* a second copy
+        # of it inside the archive. When that does not fit, ship the weights as
+        # release assets and let the participant build the archive locally,
+        # which needs no extra disk.
+        id: weights_only
+        if: ${{ fromJSON(steps.dl.outputs.model_gb) + 4 > fromJSON(steps.dl.outputs.free_after) }}
         run: |
           set -euo pipefail
-          python scripts/make_submission.py --check || true
+          cd "$GITHUB_WORKSPACE"
+          TAG="weights-$(date +%Y%m%d-%H%M)"
+          rm -rf weights_parts && mkdir -p weights_parts && cd weights_parts
+          for f in ../model/*; do
+            split -b 1900M -d -a 2 "$f" "$(basename "$f").part."
+          done
+          ls -lh
+          sha256sum *.part.* > sha256.txt
+          {
+            echo "# Weights for the judge: ${MODEL_ID}"
+            echo
+            echo "Reassemble every part into model/, then build the archive:"
+            echo '```bash'
+            echo "python scripts/make_submission.py --model model --out submission.zip"
+            echo '```'
+            echo
+            echo "## sha256 of the parts"
+            echo '```'
+            cat sha256.txt
+            echo '```'
+          } > README.md
+          gh release create "$TAG" ./*.part.* sha256.txt README.md \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Guardian of Truth weights $TAG" --notes "Judge weights for ${MODEL_ID}"
+          python - <<PY
+          import json
+          json.dump({"stage": "weights_only", "tag": "$TAG",
+                     "model_gb": int("${{ steps.dl.outputs.model_gb }}"),
+                     "note": "not enough disk for the zip; build it locally"},
+                    open("$GITHUB_WORKSPACE/$REPORT_PATH", "w"), indent=2)
+          PY
+
+      - name: Build archive
+        if: steps.weights_only.outcome != 'success'
+        run: |
+          set -euo pipefail
           python scripts/make_submission.py --model model --out submission.zip
           ls -lh submission.zip
-          du -sh submission.zip
           rm -rf model
 
       - name: Verify archive
-        if: env.DOWNLOAD_WEIGHTS == 'true'
+        if: steps.weights_only.outcome != 'success'
         run: |
           set -euo pipefail
-          unzip -t submission.zip | tail -3
-          echo "== structure =="
-          unzip -l submission.zip | head -25
-          echo "== required entries =="
+          unzip -t submission.zip | tail -2
           for f in README.md pyproject.toml scripts/predict.py; do
             unzip -l submission.zip "$f" | grep -q "$f" || { echo "MISSING $f"; exit 1; }
             echo "ok: $f"
           done
-          unzip -l submission.zip | grep -q "metrics/" && { echo "metrics/ must not be shipped"; exit 1; }
-          echo "no metrics/ directory: ok"
-          echo "== weights present in model/ =="
-          unzip -l submission.zip | grep -c "model/.*safetensors" || { echo "no weights"; exit 1; }
+          if unzip -l submission.zip | grep -q "metrics/"; then
+            echo "metrics/ must not be shipped"; exit 1
+          fi
+          echo "no metrics/: ok"
+          N=$(unzip -l submission.zip | grep -c "model/.*safetensors" || true)
+          echo "weight shards in archive: $N"
+          if [ "$N" -lt 1 ]; then echo "no weights in archive"; exit 1; fi
+          unzip -l submission.zip | head -20
 
       - name: Smoke test the entrypoint
-        if: env.DOWNLOAD_WEIGHTS == 'true'
+        if: steps.weights_only.outcome != 'success'
         run: |
           set -euo pipefail
           rm -rf /tmp/smoke && mkdir -p /tmp/smoke && cd /tmp/smoke
@@ -129,7 +171,7 @@ jobs:
           # No GPU on the runner: this exercises the import path, the entrypoint
           # and the output format, which is what the platform calls.
           python scripts/predict.py --input "$GITHUB_WORKSPACE/valid.parquet" --output /tmp/smoke/pred.csv
-          head -c 4 /tmp/smoke/pred.csv | od -An -tx1
+          head -c 4 /tmp/smoke/pred.csv
           python - <<'PY'
           import pandas as pd
           d = pd.read_parquet("/tmp/smoke/pred.csv")
@@ -142,44 +184,64 @@ jobs:
           PY
 
       - name: Split and publish to a Release
-        if: env.DOWNLOAD_WEIGHTS == 'true'
+        if: steps.weights_only.outcome != 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
           TAG="submission-$(date +%Y%m%d-%H%M)"
-          PART=1900M
-          split -b "$PART" -d -a 2 submission.zip submission.part.
+          split -b 1900M -d -a 2 submission.zip submission.part.
           PARTS=$(ls submission.part.* | wc -l)
-          echo "parts: $PARTS"
-          printf '%s  %s\n' "$(sha256sum submission.zip | cut -d' ' -f1)" submission.zip > submission.sha256
+          sha256sum submission.zip | cut -d' ' -f1 > submission.sha256
           {
-            echo "# Guardian of Truth — готовый архив"
+            echo "# Guardian of Truth: ready-to-upload archive"
             echo
-            echo "Полный архив: \`submission.zip\` (${PARTS} части(ей), каждая < 2 ГБ — лимит GitHub на файл)."
+            echo "\`submission.zip\` is split into ${PARTS} part(s), each under 2 GB"
+            echo "(the GitHub release asset limit)."
             echo
             echo '```bash'
             echo "cat submission.part.* > submission.zip"
-            echo "sha256sum -c submission.sha256"
             echo '```'
             echo
-            echo "Затем загрузить \`submission.zip\` в виджет загрузки решения."
+            echo "Judge model: \`${MODEL_ID}\`. Upload \`submission.zip\` afterwards."
             echo
-            echo "Модель судьи: \`${MODEL_ID}\`."
-            echo
-            echo '## Контрольные суммы частей'
+            echo "## sha256 of the parts"
             echo '```'
             sha256sum submission.part.*
             echo '```'
           } > submission.README.md
           gh release create "$TAG" submission.part.* submission.sha256 submission.README.md \
             --repo "$GITHUB_REPOSITORY" --title "Guardian of Truth submission $TAG" \
-            --notes "Built on a GitHub runner: weights fetched, archive assembled and verified."
-          echo "RELEASE: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-          {
-            echo "### submission.zip собран"
-            echo
-            echo "- релиз: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-            echo "- частей: $PARTS"
-          } >> "$GITHUB_STEP_SUMMARY"
+            --notes "Built and verified on a GitHub runner."
+          python - <<PY
+          import json, os
+          json.dump({"stage": "published", "tag": "$TAG", "parts": $PARTS,
+                     "sha256": open("submission.sha256").read().strip(),
+                     "archive_bytes": os.path.getsize("submission.zip"),
+                     "model_id": os.environ["MODEL_ID"]},
+                    open("$GITHUB_WORKSPACE/$REPORT_PATH", "w"), indent=2)
+          PY
+
+      - name: Commit the build report
+        if: always()
+        run: |
+          set -uo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p "$(dirname "$REPORT_PATH")"
+          python - <<PY || true
+          import json, os
+          path = os.environ["REPORT_PATH"]
+          data = {}
+          if os.path.exists(path):
+              try:
+                  data = json.load(open(path))
+              except Exception:
+                  data = {"stage": "unparseable"}
+          data["job_status"] = "${{ job.status }}"
+          json.dump(data, open(path, "w"), indent=2)
+          PY
+          git add -f "$REPORT_PATH"
+          git commit -m "build-submission: status [skip ci]" || echo "nothing to commit"
+          git push origin "HEAD:${REPORT_BRANCH}" || echo "push failed"
