@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import sys
 import zipfile
 from pathlib import Path
@@ -42,7 +43,7 @@ EXCLUDE_DIRS = {
     ".venv", "venv", "build", "dist", "*.egg-info", "metrics", "data", ".hf_cache",
     ".idea", ".vscode", "reports", "tests",
 }
-EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".pyd", ".log", ".parquet", ".csv", ".jsonl"}
+EXCLUDE_SUFFIXES = {".pyc", ".pyo", ".pyd", ".log", ".parquet", ".csv", ".jsonl", ".zip"}
 EXCLUDE_NAMES = {".DS_Store", ".gitignore", ".dockerignore", "Makefile", "Dockerfile"}
 
 #: The platform runs ``scripts/predict.py`` from the root of the archive.
@@ -125,8 +126,10 @@ def build(root: Path, out: Path, model_dir: Path | None = None) -> int:
             info = zipfile.ZipInfo(str(rel).replace(os.sep, "/"))
             info.external_attr = FILE_MODE << 16
             info.compress_type = zipfile.ZIP_DEFLATED
-            with open(source, "rb") as fh:
-                zf.writestr(info, fh.read())
+            # Stream the file: a 2 GB safetensors shard must not be read into
+            # memory in one go.
+            with open(source, "rb") as fh, zf.open(info, "w") as dest:
+                shutil.copyfileobj(fh, dest, length=4 << 20)
     tmp.replace(out)
     return out.stat().st_size
 
