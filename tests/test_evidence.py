@@ -140,3 +140,63 @@ def test_evidence_keeps_all_user_turns_when_they_fit():
     assert evidence.text.count("⟦USER⟧") == 2
     assert "I want a refund." in evidence.text
     assert "For order W1." in evidence.text
+
+
+def test_long_policy_borrows_up_to_the_cap():
+    """A policy that overflows its share must not be cut to half.
+
+    The telecom policy is ~23k characters. With a flat 40% share it lost ~49%
+    of its rules, leaving the judge unable to check the ones that were dropped.
+    """
+    from guardian.evidence import EvidenceConfig, build_evidence, extract_policy
+    from guardian.toolspec import extract_available_tools
+    from guardian.transcript import parse_response, parse_transcript
+
+    sections = "\n".join(
+        f"# Section {i}\n" + (f"rule_{i} " * 60) for i in range(40)
+    )
+    policy = "<main_policy>\n# Telecom Agent Policy\n\nThe current time is now.\n" + sections
+    assert len(policy) > 12_000
+
+    prompt = f"⟦SYSTEM⟧\nAgent.\n{policy}\n⟦USER⟧\nу меня не работает MMS\n⟦ASSISTANT · ход 1⟧\nпроверяю\n"
+    transcript = parse_transcript(prompt)
+    response = parse_response("⟦ASSISTANT · ход 2⟧\nЯ еще раз отправлю команду на сброс настроек APN.")
+    cfg = EvidenceConfig(max_chars=30_000)
+    evidence = build_evidence(
+        transcript, response, extract_available_tools(transcript.system_text), cfg
+    )
+    full = extract_policy(transcript.system_text)
+    ratio = len(evidence.policy_excerpt) / len(full)
+    assert ratio > 0.60, f"only {ratio:.2%} of the policy survived"
+    # The budget must still be respected.
+    assert len(evidence.text) <= cfg.max_chars
+
+
+def test_policy_section_selection_anchors_on_tool_names():
+    """English policy + Russian response: tool names pick the relevant section."""
+    from guardian.evidence import EvidenceConfig, build_evidence
+    from guardian.toolspec import extract_available_tools
+    from guardian.transcript import parse_response, parse_transcript
+
+    filler = "\n".join(f"# Other {i}\n" + ("unrelated words " * 40) for i in range(30))
+    policy = (
+        "<main_policy>\n# Telecom Agent Policy\n\nintro\n"
+        "# APN reset\nAlways confirm before reset_apn_settings.\n"
+        + filler
+        + "\n# Billing\nPayment rules.\n"
+    )
+    system = (
+        f"⟦SYSTEM⟧\nAgent.\n{policy}\n"
+        "[AVAILABLE TOOLS]\n- reset_apn_settings: reset APN\n- check_status: status\n"
+    )
+    transcript = parse_transcript(
+        system + "⟦USER⟧\nсброси настройки\n⟦ASSISTANT · ход 1⟧\nок\n"
+    )
+    response = parse_response(
+        "⟦ASSISTANT · ход 2⟧\nЯ еще раз отправлю команду на сброс настроек APN."
+    )
+    evidence = build_evidence(
+        transcript, response, extract_available_tools(transcript.system_text),
+        EvidenceConfig(max_chars=6_000),
+    )
+    assert "Always confirm before reset_apn_settings." in evidence.policy_excerpt

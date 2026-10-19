@@ -216,3 +216,5 @@ python scripts/make_dev_from_tau2.py --tau2-root /tmp/tau2 \
   соответствует правилам конкурса.
 
 Подробное описание подхода, сигналов и дизайна промпта — в [`docs/APPROACH.md`](docs/APPROACH.md).
+
+Требования к формату сабмита и особенности среды обсчёта (ZIP без обёрточной папки, `metrics/` запрещён, Parquet вместо CSV, vLLM 0.19.1 и отсутствие `pip install`) — в [`docs/SUBMISSION.md`](docs/SUBMISSION.md). Готовый архив собирается командой `python scripts/make_submission.py --out submission.zip`.

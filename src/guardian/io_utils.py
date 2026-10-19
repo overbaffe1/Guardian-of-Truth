@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
@@ -82,8 +83,20 @@ def read_table(path: str) -> list[dict[str, Any]]:
 
 
 def write_predictions(
-    path: str, predictions: list[Prediction], with_details: bool = False
+    path: str,
+    predictions: list[Prediction],
+    with_details: bool = False,
+    fmt: Optional[str] = None,
 ) -> None:
+    """Write predictions.
+
+    The competition scorer reads the output as **Parquet**, and it still does
+    so when ``--output`` is handed to us with a ``.csv`` suffix: participants
+    lost whole attempts to stage 22 ("metric calculation failed") because they
+    honoured the extension. The extension of ``--output`` is therefore ignored
+    and Parquet is written to that exact path. Set ``fmt`` (or the
+    ``GUARDIAN_OUTPUT_FORMAT`` environment variable) to override locally.
+    """
     import pandas as pd
 
     rows = [p.to_row(with_details=with_details) for p in predictions]
@@ -96,13 +109,29 @@ def write_predictions(
 
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
-    if p.suffix.lower() in {".parquet", ".pq"}:
+
+    fmt = (fmt or os.environ.get("GUARDIAN_OUTPUT_FORMAT") or "auto").strip().lower()
+    if fmt == "auto":
+        suffix = p.suffix.lower()
+        # Default to Parquet regardless of the extension we were given.
+        chosen = "parquet"
+        if suffix in {".csv", ".tsv"}:
+            logger.warning(
+                "Output path ends with %s but the scorer reads Parquet; writing "
+                "Parquet to %s as well.",
+                suffix,
+                p,
+            )
+    else:
+        chosen = fmt
+
+    if chosen == "parquet":
         df.to_parquet(p, index=False)
-    elif p.suffix.lower() in {".csv", ".tsv"}:
-        df.to_csv(p, index=False, sep="\t" if p.suffix.lower() == ".tsv" else ",")
+    elif chosen in {"csv", "tsv"}:
+        df.to_csv(p, index=False, sep="\t" if chosen == "tsv" else ",")
     else:
         df.to_json(p, orient="records", lines=True, force_ascii=False)
-    logger.info("Wrote %d predictions to %s", len(df), path)
+    logger.info("Wrote %d predictions to %s (%s)", len(df), path, chosen)
 
 
 def dump_debug(path: str, records: list[dict[str, Any]]) -> None:

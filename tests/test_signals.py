@@ -233,3 +233,113 @@ def test_text_schema_violation_is_only_soft():
     signals = compute_signals(t, r, specs)
     assert "invalid_tool_arguments" in kinds(signals, "soft")
     assert "invalid_tool_arguments" not in kinds(signals, "hard")
+
+
+# ---------------------------------------------------------------------------
+# Multilingual lexical rules (the public split is ~60% Russian)
+# ---------------------------------------------------------------------------
+
+TELECOM_SYSTEM = """⟦SYSTEM⟧
+Ты — оператор связи.
+<policy>
+# Telecom Policy
+Перед сбросом настроек нужно получить подтверждение пользователя (да).
+</policy>
+
+[AVAILABLE TOOLS]
+- reset_apn_settings: сбросить настройки APN
+- run_speed_test: запустить замер скорости
+"""
+
+
+def test_russian_claimed_action_without_tool_call_is_detected():
+    t, r, specs = build(
+        "⟦USER⟧\nу меня не работает MMS\n⟦ASSISTANT · ход 1⟧\nпроверяю\n",
+        "⟦ASSISTANT · ход 2⟧\nЯ еще раз отправлю команду на сброс настроек APN.\n"
+        "Сброс настроек APN отправлен повторно.",
+        domain_system=TELECOM_SYSTEM,
+    )
+    signals = compute_signals(t, r, specs)
+    assert "claimed_action_without_tool_call" in kinds(signals, "soft")
+
+
+def test_russian_false_refusal_is_detected():
+    t, r, specs = build(
+        "⟦USER⟧\nпоменяйте товар в заказе\n⟦ASSISTANT · ход 1⟧\nсмотрю заказ\n",
+        "⟦ASSISTANT · ход 2⟧\nЯ не смогу исправить это самостоятельно с помощью "
+        "имеющихся инструментов.",
+        domain_system=TELECOM_SYSTEM,
+    )
+    signals = compute_signals(t, r, specs)
+    assert "possible_false_refusal" in kinds(signals, "soft")
+
+
+def test_russian_explicit_confirmation_suppresses_missing_confirmation():
+    """A bare "нет" inside a sentence must not be read as a refusal to confirm.
+
+    Regression: anchoring the Russian negative pattern to the start of a line
+    keeps "у меня нет данных" from suppressing the missing-confirmation hint.
+    """
+    t, r, specs = build(
+        "⟦USER⟧\nотмените бронирование IFOYYZ\n⟦ASSISTANT · ход 1⟧\nок\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL reset_apn_settings: {}",
+    )
+    assert "missing_confirmation" in kinds(compute_signals(t, r, specs), "soft")
+
+    t2, r2, specs2 = build(
+        "⟦USER⟧\nДа, подтверждаю! У меня нет других вопросов.\n"
+        "⟦ASSISTANT · ход 1⟧\nок\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL reset_apn_settings: {}",
+    )
+    assert "missing_confirmation" not in kinds(compute_signals(t2, r2, specs2), "soft")
+
+
+def test_placeholder_argument_is_hard():
+    t, r, specs = build(
+        "⟦USER⟧\nзакройте мой счёт\n⟦ASSISTANT · ход 1⟧\nищу счёт\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL reset_apn_settings: "
+        '{"account_id": "light_blue_account_id_placeholder"}',
+    )
+    signals = compute_signals(t, r, specs)
+    assert "placeholder_argument" in kinds(signals, "hard")
+
+
+def test_real_identifier_is_not_flagged_as_placeholder():
+    t, r, specs = build(
+        "⟦USER⟧\nотмените бронирование EHGLP3\n⟦ASSISTANT · ход 1⟧\nок\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL reset_apn_settings: "
+        '{"reservation_id": "EHGLP3", "reason": "customer request"}',
+    )
+    assert "placeholder_argument" not in kinds(compute_signals(t, r, specs))
+
+
+def test_nested_discoverable_tool_arguments_are_inspected():
+    """The wrapper hides the real call, so the payload must be decoded."""
+    system = (
+        "⟦SYSTEM⟧\nYou are a banking agent.\n[AVAILABLE TOOLS]\n"
+        "- log_verification: log a verification event\n"
+        "- call_discoverable_agent_tool: invoke a discoverable tool\n"
+    )
+    t, r, specs = build(
+        "⟦USER⟧\nзакройте счёт\n⟦ASSISTANT · ход 1⟧\nищу счёт\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL call_discoverable_agent_tool: "
+        '{"agent_tool_name": "close_bank_account_7392", "arguments": '
+        '"{\\"account_id\\": \\"light_blue_account_id_placeholder\\"}"}',
+        domain_system=system,
+    )
+    signals = compute_signals(t, r, specs)
+    assert "placeholder_argument" in kinds(signals, "hard")
+
+
+def test_nested_tool_name_availability_is_checked():
+    system = (
+        "⟦SYSTEM⟧\nYou are a banking agent.\n[AVAILABLE TOOLS]\n"
+        "- call_discoverable_agent_tool: invoke a discoverable tool\n"
+    )
+    t, r, specs = build(
+        "⟦USER⟧\nзакройте счёт\n⟦ASSISTANT · ход 1⟧\nок\n",
+        "⟦ASSISTANT · ход 2⟧\n\t→ TOOL_CALL call_discoverable_agent_tool: "
+        '{"agent_tool_name": "delete_everything", "arguments": "{}"}',
+        domain_system=system,
+    )
+    assert "tool_not_available" in kinds(compute_signals(t, r, specs))

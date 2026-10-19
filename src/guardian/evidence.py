@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from .text_utils import (
     compact_json,
@@ -31,6 +31,10 @@ from .types import Event, ResponseTurn, Transcript
 class EvidenceConfig:
     max_chars: int = 30_000          # ~10k tokens
     policy_ratio: float = 0.40
+    #: A long policy (telecom is ~23k chars) is allowed to borrow up to this
+    #: share of the budget when it would otherwise be cut in half. Domains with
+    #: short policies are unaffected because the cap only binds when needed.
+    policy_cap_ratio: float = 0.65
     tools_ratio: float = 0.08
     max_tool_response_chars: int = 3_500
     max_tool_call_chars: int = 700
@@ -73,7 +77,7 @@ def _query_text(response: ResponseTurn) -> str:
     return "\n".join(p for p in parts if p)
 
 
-def _shrink_policy(policy: str, budget: int, query: str) -> str:
+def _shrink_policy(policy: str, budget: int, query: str, anchors: Iterable[str] = ()) -> str:
     if len(policy) <= budget:
         return policy
     # Keep the header and the sections that share vocabulary with the response.
@@ -81,9 +85,19 @@ def _shrink_policy(policy: str, budget: int, query: str) -> str:
     head_budget = min(4_000, budget // 3)
     chosen: list[str] = [truncate_middle(sections[0], head_budget)]
     used = len(chosen[0])
+    # The policies are written in English while the dialogue is often Russian,
+    # so vocabulary overlap with the response is near zero and the ranking
+    # degenerates to document order. Tool names are the one language-free
+    # anchor available: a section that documents a tool the agent actually
+    # called is very likely the section that governs it.
+    anchor_tokens = [a.lower() for a in anchors if a and len(a) >= 4]
     scored = []
     for idx, section in enumerate(sections[1:], start=1):
-        scored.append((overlap_score(query, section), idx, section))
+        score = overlap_score(query, section)
+        if anchor_tokens:
+            section_low = section.lower()
+            score += 0.5 * sum(1 for a in anchor_tokens if a in section_low)
+        scored.append((score, idx, section))
     scored.sort(key=lambda x: (-x[0], x[1]))
     for score, _, section in scored:
         if used + len(section) > budget:
@@ -241,9 +255,15 @@ def build_evidence(
     query = _query_text(response)
 
     # -- 1. policy -----------------------------------------------------------
-    policy_budget = int(total_budget * cfg.policy_ratio)
     policy_full = extract_policy(transcript.system_text)
-    policy = _shrink_policy(policy_full, policy_budget, query)
+    # A policy that overflows its share of the budget may borrow up to the cap;
+    # dropping half of the rules leaves the judge unable to check them at all.
+    policy_budget = int(total_budget * cfg.policy_ratio)
+    if len(policy_full) > policy_budget:
+        policy_budget = max(policy_budget, int(total_budget * cfg.policy_cap_ratio))
+    # Tool names are the language-free key to the governing policy section.
+    policy_anchors = list(specs) + [tc.name for tc in response.tool_calls if tc.name]
+    policy = _shrink_policy(policy_full, policy_budget, query, policy_anchors)
 
     # -- 2. tool catalogue ---------------------------------------------------
     tools_budget = int(total_budget * cfg.tools_ratio)

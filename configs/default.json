@@ -4,7 +4,7 @@
     "id": "Qwen/Qwen2.5-14B-Instruct-AWQ",
     "path": "",
     "max_model_len": 32768,
-    "max_prompt_tokens": 12000,
+    "max_prompt_tokens": 18000,
     "gpu_memory_utilization": 0.9,
     "dtype": "bfloat16",
     "load_in_4bit": false,

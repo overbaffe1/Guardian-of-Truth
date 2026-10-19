@@ -214,10 +214,21 @@ def truncate_middle(text: str, limit: int) -> str:
 
 
 def estimate_tokens(text: str) -> int:
-    """Conservative character-based token estimate (works for EN + JSON)."""
+    """Conservative character-based token estimate for EN, RU and JSON.
+
+    A flat ``len/3`` underestimates badly on Cyrillic, which costs roughly
+    2 characters per token against 3.5 for Latin text. About 60% of the public
+    split is Russian, so the density is measured instead of assumed.
+    """
     if not text:
         return 0
-    return int(len(text) / 3.0) + 1
+    cyrillic = 0
+    for ch in text:
+        low = ch.lower()
+        if "а" <= low <= "я" or low == "ё":
+            cyrillic += 1
+    latin = len(text) - cyrillic
+    return int(cyrillic / 2.0 + latin / 3.5) + 1
 
 
 def strip_markdown(text: str) -> str:

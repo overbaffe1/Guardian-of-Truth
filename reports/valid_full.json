@@ -1,0 +1,169 @@
+{
+  "dataset": {
+    "domains": {
+      "airline": 12,
+      "retail": 11,
+      "telecom": 23
+    },
+    "labels": {
+      "negatives": 23,
+      "positive_rate": 0.5,
+      "positives": 23
+    },
+    "labels_by_domain": {
+      "airline": {
+        "n": 1,
+        "pos": 0
+      },
+      "retail": {
+        "n": 1,
+        "pos": 1
+      },
+      "telecom": {
+        "n": 1,
+        "pos": 0
+      }
+    },
+    "median_tools": 14,
+    "prompt_chars": {
+      "max": 233104,
+      "mean": 42614.3,
+      "median": 30437,
+      "p90": 74196,
+      "p95": 126322
+    },
+    "response_chars": {
+      "max": 2339,
+      "mean": 518.5,
+      "median": 419,
+      "p90": 803,
+      "p95": 1291
+    },
+    "responses_text_only": 23,
+    "responses_with_tool_calls": 23,
+    "rows": 46,
+    "with_policy_tag": 46,
+    "with_tool_catalogue": 46
+  },
+  "elapsed_sec": 1.6,
+  "file": {
+    "bytes": 984388,
+    "name": "data.parquet",
+    "sha256": "8e730cc999a6cf07c3f17f273300a17ce16539c5b6166885e74b41e93cfc47ba"
+  },
+  "heuristic": {
+    "accuracy": 0.6086956521739131,
+    "best_threshold": {
+      "accuracy": 0.5,
+      "f1": 0.6666666666666666,
+      "n": 46.0,
+      "positives": 23.0,
+      "precision": 0.5,
+      "recall": 1.0,
+      "threshold": 0.01
+    },
+    "confusion": {
+      "fn": 17,
+      "fp": 1,
+      "tn": 22,
+      "tp": 6
+    },
+    "f1": 0.4,
+    "n": 46.0,
+    "positive_rate": 0.152,
+    "positives": 23.0,
+    "precision": 0.8571428571428571,
+    "recall": 0.2608695652173913,
+    "rows": 46,
+    "strict_hard_only": {
+      "flagged": 2,
+      "precision": 1.0,
+      "recall": 0.087,
+      "tp": 2
+    }
+  },
+  "label": "valid_full",
+  "signals": {
+    "action_targets_unrequested_entity": {
+      "coverage": 0.043,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 2,
+      "pos": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.087
+    },
+    "claimed_action_without_tool_call": {
+      "coverage": 0.022,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 1,
+      "pos": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.043
+    },
+    "duplicate_tool_call": {
+      "coverage": 0.043,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 2,
+      "pos": 2,
+      "precision": 1.0,
+      "recall_of_positives": 0.087
+    },
+    "invalid_tool_arguments": {
+      "coverage": 0.022,
+      "hard": 1,
+      "hard_fraction": 1.0,
+      "n": 1,
+      "pos": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.043
+    },
+    "missing_confirmation": {
+      "coverage": 0.022,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 1,
+      "pos": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.043
+    },
+    "placeholder_argument": {
+      "coverage": 0.022,
+      "hard": 1,
+      "hard_fraction": 1.0,
+      "n": 1,
+      "pos": 1,
+      "precision": 1.0,
+      "recall_of_positives": 0.043
+    },
+    "possible_false_refusal": {
+      "coverage": 0.065,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 3,
+      "pos": 1,
+      "precision": 0.333,
+      "recall_of_positives": 0.043
+    },
+    "tool_not_available": {
+      "coverage": 0.13,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 6,
+      "pos": 6,
+      "precision": 1.0,
+      "recall_of_positives": 0.261
+    },
+    "ungrounded_number": {
+      "coverage": 0.022,
+      "hard": 0,
+      "hard_fraction": 0.0,
+      "n": 1,
+      "pos": 0,
+      "precision": 0.0,
+      "recall_of_positives": 0.0
+    }
+  }
+}
