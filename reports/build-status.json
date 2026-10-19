@@ -1,0 +1,9 @@
+{
+  "stage": "published",
+  "tag": "submission-20261018-2115",
+  "parts": 5,
+  "sha256": "91a1c214475734e752f5c7d5641d0c1fec5a588ea2eba5a94fb36cd6a250b08f",
+  "archive_bytes": 8591082039,
+  "model_id": "Qwen/Qwen2.5-14B-Instruct-AWQ",
+  "job_status": "success"
+}
