@@ -1,6 +1,9 @@
-"""Tests for the predict CLI helpers."""
+"""Tests for the command-line tools and the README demo."""
 
 import importlib.util
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,3 +82,37 @@ def test_doctor_smoke_on_heuristic(tmp_path, capsys):
     assert code == 0
     out = capsys.readouterr().out
     assert '"rows": 2' in out
+
+
+def test_portfolio_demo_runs_without_model(tmp_path):
+    import pandas as pd
+
+    fixture = ROOT / "tests/fixtures/portfolio_demo.jsonl"
+    output = tmp_path / "predictions.parquet"
+    debug = tmp_path / "debug.jsonl"
+    result = subprocess.run(
+        [
+            sys.executable, str(ROOT / "scripts/predict.py"),
+            "--backend", "heuristic", "--input", str(fixture), "--output", str(output),
+            "--debug-jsonl", str(debug),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["backend"] == "heuristic"
+
+    expected = [json.loads(line) for line in fixture.read_text(encoding="utf-8").splitlines()]
+    frame = pd.read_parquet(output)
+    assert list(frame.columns) == ["id", "label"]
+    assert frame.to_dict(orient="records") == [
+        {"id": row["id"], "label": row["label"]} for row in expected
+    ]
+    clean, flagged = (json.loads(line) for line in debug.read_text(encoding="utf-8").splitlines())
+    assert clean["signals"] == []
+    assert any(
+        signal["kind"] == "tool_not_available" and signal["severity"] == "hard"
+        for signal in flagged["signals"]
+    )

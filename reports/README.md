@@ -1,6 +1,24 @@
-# Remote reports
+# Измерения и артефакты
 
-Aggregate metrics produced by `.github/workflows/remote-eval.yml` on a
-GitHub-hosted runner (the development sandbox cannot reach the competition
-storage). Only counts, distributions and metrics are stored here — never raw
-rows from the competition data.
+## Воспроизвести CPU-замер
+
+Из корня репозитория, после [установки](../README.md#запуск):
+
+```bash
+python scripts/evaluate.py --data valid.parquet --backend heuristic
+python scripts/signal_audit.py --data valid.parquet
+```
+
+Первая команда запускает текущий эвристический режим и возвращает F1 `0.6857` (TP `12`, TN `23`, FP `0`, FN `11`). Вторая отдельно считает метрики для случаев с жёсткими сигналами и для случаев с любым сигналом. [`valid.parquet`](../valid.parquet) — размеченный сбалансированный срез из 46 примеров, использованный для настройки правил, не полный публичный сплит. Эти команды не измеряют качество LLM-судьи.
+
+## Сохранённые отчёты
+
+| Файл | Что в нём |
+| --- | --- |
+| [`valid-rules.json`](valid-rules.json) | Сигналы и упаковка контекста на срезе из 46 примеров. |
+| [`valid_full.json`](valid_full.json) | Исторический прогон прежней эвристики на 46 строках. Несмотря на имя файла, это не полный публичный сплит и не текущий результат. |
+| [`fixture.json`](fixture.json) | Дымовой тест на шести синтетических записях, не бенчмарк качества. |
+| [`runner-check.txt`](runner-check.txt) | Снимок окружения CI-раннера. |
+| [`build-status.json`](build-status.json) | Статус сборки архива: модель, размер, контрольная сумма и релиз. Это не отчёт скоринга. |
+
+Удалённая оценка через [remote-eval](../.github/workflows/remote-eval.yml) сохраняет в отчётах агрегаты, а не исходные строки.
