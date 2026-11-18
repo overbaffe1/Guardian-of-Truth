@@ -17,5 +17,6 @@ model/*
 *.jsonl
 !tests/fixtures/*.jsonl
 !tests/fixtures/*.csv
+!docs/assets/showcase/scorecard.csv
 .env
 predictions*

@@ -1,0 +1,164 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="344" viewBox="0 0 880 344" role="img" aria-labelledby="title">
+<title id="title">46 ходов, CPU. Только hard: F1 0.160, Любой сигнал: F1 0.632, Эвристика CPU: F1 0.686.</title>
+<rect x=".5" y=".5" width="879" height="343" rx="15" fill="#f5efe2" stroke="#c9c1af"/>
+<g font-family="system-ui, DejaVu Sans, sans-serif" fill="#192a27">
+<text x="32" y="42" font-size="15" letter-spacing="2" fill="#4c5c54">03 / КОНТРОЛЬНАЯ ПЛАСТИНА</text>
+<text x="32" y="84" font-size="32" font-weight="700">Что нашли правила</text>
+<text x="848" y="82" font-size="16" text-anchor="end" fill="#4c5c54">46 ходов · CPU</text>
+<path d="M32 101H848" stroke="#c9c1af"/>
+<text x="32" y="146" font-size="19" font-weight="600">Только hard</text>
+<rect x="244" y="131" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="255" y="131" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="266" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="277" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="288" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="299" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="310" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="321" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="332" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="343" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="354" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="365" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="376" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="387" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="398" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="409" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="420" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="431" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="442" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="453" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="464" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="475" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="486" y="131" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="497" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="508" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="519" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="530" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="541" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="552" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="563" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="574" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="585" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="596" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="607" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="618" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="629" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="640" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="651" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="662" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="673" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="684" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="695" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="706" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="717" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="728" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="739" y="131" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<text x="847" y="146" text-anchor="end" font-size="19" font-weight="650">0.160</text>
+<text x="32" y="202" font-size="19" font-weight="600">Любой сигнал</text>
+<rect x="244" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="255" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="266" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="277" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="288" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="299" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="310" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="321" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="332" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="343" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="354" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="365" y="187" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="376" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="387" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="398" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="409" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="420" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="431" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="442" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="453" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="464" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="475" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="486" y="187" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="497" y="187" width="8" height="20" rx="1.5" fill="#926320"/>
+<rect x="508" y="187" width="8" height="20" rx="1.5" fill="#926320"/>
+<rect x="519" y="187" width="8" height="20" rx="1.5" fill="#926320"/>
+<rect x="530" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="541" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="552" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="563" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="574" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="585" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="596" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="607" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="618" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="629" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="640" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="651" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="662" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="673" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="684" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="695" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="706" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="717" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="728" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="739" y="187" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<text x="847" y="202" text-anchor="end" font-size="19" font-weight="650">0.632</text>
+<rect x="21" y="226" width="838" height="51" rx="6" fill="#e0eadd"/>
+<text x="32" y="258" font-size="19" font-weight="600">Эвристика CPU</text>
+<rect x="244" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="255" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="266" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="277" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="288" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="299" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="310" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="321" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="332" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="343" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="354" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="365" y="243" width="8" height="20" rx="1.5" fill="#31705f"/>
+<rect x="376" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="387" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="398" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="409" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="420" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="431" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="442" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="453" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="464" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="475" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="486" y="243" width="8" height="20" rx="1.5" fill="#c35431"/>
+<rect x="497" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="508" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="519" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="530" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="541" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="552" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="563" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="574" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="585" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="596" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="607" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="618" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="629" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="640" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="651" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="662" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="673" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="684" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="695" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="706" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="717" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="728" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<rect x="739" y="243" width="8" height="20" rx="1.5" fill="#c9c1af"/>
+<text x="847" y="258" text-anchor="end" font-size="19" font-weight="650">0.686</text>
+<text x="847" y="116" text-anchor="end" font-size="12" fill="#4c5c54">F1</text>
+<rect x="32" y="302" width="13" height="13" rx="2" fill="#31705f"/>
+<text x="53" y="314" font-size="15" fill="#4c5c54">Найдены</text>
+<rect x="237" y="302" width="13" height="13" rx="2" fill="#c35431"/>
+<text x="258" y="314" font-size="15" fill="#4c5c54">Пропущены</text>
+<rect x="442" y="302" width="13" height="13" rx="2" fill="#926320"/>
+<text x="463" y="314" font-size="15" fill="#4c5c54">Ложные тревоги</text>
+<rect x="647" y="302" width="13" height="13" rx="2" fill="#c9c1af"/>
+<text x="668" y="314" font-size="15" fill="#4c5c54">Верно чистые</text>
+</g>
+</svg>
