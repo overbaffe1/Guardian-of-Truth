@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Полевой архив Guardian of Truth: три интерактивных экспоната хакатонного детектора галлюцинаций.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23112521'/%3E%3Ccircle cx='15' cy='16' r='9' fill='none' stroke='%23a9d4be' stroke-width='2'/%3E%3Cpath d='M15 16h12' stroke='%23f49266' stroke-width='2'/%3E%3C/svg%3E">
+  <title>Полевой архив / Guardian of Truth</title>
+  <style>@@STYLE@@</style>
+</head>
+<body>
+  <a class="skip" href="#audit">К экспонатам</a>
+  <header class="night" id="top">
+    <div class="wrap topbar">
+      <a class="wordmark" href="#top" aria-label="Guardian of Truth, в начало">
+        <span class="mark" aria-hidden="true"></span> GUARDIAN OF TRUTH
+      </a>
+      <span class="edition mono">ПОЛЕВОЙ АРХИВ <span class="dim">/</span> ВЫПУСК 01</span>
+      <a class="repo" href="https://github.com/overbaffe1/Guardian-of-Truth">Репозиторий <span aria-hidden="true">↗</span></a>
+    </div>
+    <div class="wrap hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><i aria-hidden="true"></i> ХАКАТОННЫЙ ПРОТОТИП · AI/ML</div>
+        <h1>Слова под<br><em>сверку.</em></h1>
+        <p>Что LLM-агент мог знать и делать? Сверьте его ход, просветите контекст и пересчитайте ошибки — три опыта из хакатонного детектора галлюцинаций.</p>
+        <a class="hero-link" href="#audit">Открыть протокол <span aria-hidden="true">↓</span></a>
+      </div>
+      <figure class="instrument">
+        <img src="data:image/jpeg;base64,@@IMAGERY@@" width="1240" height="692" alt="Воображаемый оптический компаратор: линза над двумя лентами и оранжевый флажок на одной из них.">
+        <figcaption class="mono"><span><b>FIG. 01</b> / Оптический компаратор</span><span>ОБРАЗ</span></figcaption>
+      </figure>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <nav class="register" aria-label="Указатель экспонатов">
+      <a href="#audit"><span class="index rust">01</span><span>Разбор хода<small>Сверить вызов</small></span><i aria-hidden="true">↘</i></a>
+      <a href="#packing"><span class="index pine">02</span><span>Рентген контекста<small>Поменять бюджет</small></span><i aria-hidden="true">↘</i></a>
+      <a href="#scores"><span class="index ochre">03</span><span>Контрольная пластина<small>Сравнить правила</small></span><i aria-hidden="true">↘</i></a>
+    </nav>
+
+    <noscript><p class="notice">Для переключателей нужен JavaScript. Статичные экспонаты и результаты доступны <a href="https://github.com/overbaffe1/Guardian-of-Truth#readme">в README</a>.</p></noscript>
+
+    <section id="audit" class="exhibit" tabindex="-1" aria-labelledby="audit-title">
+      <header class="section-head">
+        <div class="mono section-no"><span class="index rust">01</span> / КОМПАРАТОР</div>
+        <h2 id="audit-title">Найти расхождение</h2>
+        <p>Один запрос, три записанных хода. Выберите запись и сверьте её с каталогом инструментов и репликой пользователя.</p>
+      </header>
+      <div class="console">
+        <div class="console-top">
+          <span class="mono console-label"><i aria-hidden="true"></i> КАССЕТА СЦЕНАРИЕВ</span>
+          <div id="cases" class="segments" role="group" aria-label="Сценарий"></div>
+        </div>
+        <div class="traces">
+          <div class="trace">
+            <h3 class="mono"><span>01 /</span> ВХОДНОЙ КОНТЕКСТ</h3>
+            <pre id="case-prompt" tabindex="0" aria-label="Входной контекст"></pre>
+          </div>
+          <div class="trace trace-call">
+            <h3 class="mono"><span>02 /</span> ХОД АГЕНТА</h3>
+            <pre id="case-response" tabindex="0" aria-label="Ход агента"></pre>
+          </div>
+        </div>
+        <div class="verdict-row">
+          <button id="inspect" class="primary" type="button" aria-controls="verdict">Сверить ход <span aria-hidden="true">→</span></button>
+          <div id="verdict" class="verdict" aria-live="polite" aria-atomic="true">
+            <div id="label" class="label mono"></div>
+            <div>
+              <p id="verdict-title"></p>
+              <p id="verdict-note" class="subtle"></p>
+              <ul id="signal-list" class="signals"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="footnote"><span class="mono">ЗАМЕТКА 01</span> · Метки и сигналы получены из <code>heuristic</code>: браузер показывает сохранённый CPU-прогон, а не вызывает инструменты и не запускает LLM.</p>
+    </section>
+
+    <section id="packing" class="exhibit" tabindex="-1" aria-labelledby="packing-title">
+      <header class="section-head">
+        <div class="mono section-no"><span class="index pine">02</span> / РЕНТГЕН</div>
+        <h2 id="packing-title">Оставить улику</h2>
+        <p>Здесь ранний ответ инструмента содержит контрольную точку. Поменяйте бюджет и проверьте, переживёт ли этот ответ упаковку.</p>
+      </header>
+      <div class="packing-deck">
+        <div class="slider-head">
+          <div>
+            <label for="budget" class="mono console-label">БЮДЖЕТ КОНТЕКСТА</label>
+            <p class="slider-number"><output id="budget-value" for="budget"></output> <span>симв.</span></p>
+          </div>
+          <div class="slider-controls">
+            <input type="range" id="budget" min="0" max="3" step="1" value="0" list="caps">
+            <datalist id="caps"><option value="0"><option value="1"><option value="2"><option value="3"></datalist>
+            <div id="budget-ticks" class="slider-ticks mono" aria-hidden="true"></div>
+          </div>
+        </div>
+        <div class="reading" aria-live="polite" aria-atomic="true">
+          <div><span class="mono">ИСХОДНИК</span><strong id="raw-chars"></strong></div>
+          <div><span class="mono">ПОСЛЕ УПАКОВКИ</span><strong id="packed-chars"></strong></div>
+          <div><span class="mono">С СОДЕРЖИМЫМ</span><strong id="payloads"></strong></div>
+        </div>
+        <p class="observed"><span class="mono">ХОД ПОД ПРОВЕРКОЙ</span> <span id="packed-reply"></span></p>
+        <div class="strip-head"><span class="mono">ОТВЕТЫ ИНСТРУМЕНТОВ · ПО ВРЕМЕНИ</span><span id="proof" class="proof mono"></span></div>
+        <div id="timeline" class="timeline" role="group" aria-label="Ответы инструментов"></div>
+        <ul class="key small"><li><i class="swatch whole"></i>Целиком</li><li><i class="swatch short"></i>Сокращён</li><li><i class="swatch marker"></i>Только маркер</li><li><i class="swatch gone"></i>Удалён</li></ul>
+        <div class="frames">
+          <div><h3 class="mono">ИСХОДНЫЙ КАДР <span id="frame-no"></span></h3><pre id="frame-before" tabindex="0" aria-label="Исходный кадр"></pre></div>
+          <div><h3 class="mono">В УПАКОВАННОМ КОНТЕКСТЕ <span id="frame-state"></span></h3><pre id="frame-after" tabindex="0" aria-label="Кадр в упакованном контексте"></pre></div>
+        </div>
+      </div>
+      <p class="footnote"><span class="mono">ЗАМЕТКА 02</span> · Журнал синтетический. Четыре снимка посчитаны <code>build_evidence</code>; в счётчик входят и заголовки, и политика, и маркеры.</p>
+    </section>
+
+    <section id="scores" class="exhibit" tabindex="-1" aria-labelledby="scores-title">
+      <header class="section-head">
+        <div class="mono section-no"><span class="index ochre">03</span> / КОНТРОЛЬНАЯ ПЛАСТИНА</div>
+        <h2 id="scores-title">Посчитать промахи</h2>
+        <p>Переключите три стратегии и посмотрите, за счёт каких ошибок меняется метрика. Одна ячейка — один ход; ячейки сгруппированы, а не расставлены по строкам датасета.</p>
+      </header>
+      <div class="score-deck">
+        <div class="score-controls"><span id="cohort" class="mono console-label"></span><div id="modes" class="segments" role="group" aria-label="Режим правил"></div></div>
+        <div class="score-body">
+          <div aria-live="polite" aria-atomic="true"><div class="mono">F1 / CPU</div><div id="f1" class="big-number"></div><p id="precision-recall" class="pr subtle"></p></div>
+          <div><div id="matrix" class="matrix" aria-hidden="true"></div><ul id="legend" class="key" aria-live="polite" aria-atomic="true"></ul></div>
+        </div>
+      </div>
+      <p class="footnote"><span class="mono">ЗАМЕТКА 03</span> · <code>valid.parquet</code> — настроечный срез: 46 ходов, 23 положительных. Это не независимый тест, не метрика LLM-судьи и не лидерборд.</p>
+    </section>
+  </main>
+
+  <footer class="night">
+    <div class="wrap bottom"><div><b>Guardian of Truth</b><p>Полевой архив хакатонного проекта. Три экспоната, без внешних зависимостей.</p></div><a href="https://github.com/overbaffe1/Guardian-of-Truth#readme">К README <span aria-hidden="true">↗</span></a></div>
+  </footer>
+  <script type="application/json" id="lab-data">@@DATA@@</script>
+  <script>@@SCRIPT@@</script>
+</body>
+</html>

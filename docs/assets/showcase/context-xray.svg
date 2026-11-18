@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="334" viewBox="0 0 880 334" role="img" aria-labelledby="title">
+<title id="title">Синтетический журнал до и после упаковки; оранжевый кадр — источник контрольной точки.</title>
+<rect x=".5" y=".5" width="879" height="333" rx="15" fill="#f5efe2" stroke="#c9c1af"/>
+<defs><pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse"><path d="M0 5L5 0" stroke="#a47a4f" stroke-width="1.5"/></pattern></defs>
+<g font-family="system-ui, DejaVu Sans, sans-serif" fill="#192a27">
+<text x="32" y="42" font-size="15" letter-spacing="2" fill="#4c5c54">02 / РЕНТГЕН КОНТЕКСТА</text>
+<text x="32" y="86" font-size="32" font-weight="700">Не просто отрезать хвост</text>
+<path d="M32 103H848" stroke="#c9c1af"/>
+<text x="32" y="144" font-size="19" font-weight="600">До упаковки</text>
+<text x="32" y="169" font-size="17" fill="#4c5c54">22 045 симв.</text>
+<text x="32" y="235" font-size="19" font-weight="600">После упаковки</text>
+<text x="32" y="261" font-size="17" fill="#4c5c54">3 789 / 4 000 симв.</text>
+<text x="250" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">01</text>
+<rect x="233" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M250 180v20" stroke="#b9b39f"/>
+<rect x="233" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="250" cy="228" r="2" fill="#78988f"/>
+<text x="294" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">02</text>
+<rect x="277" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M294 180v20" stroke="#b9b39f"/>
+<rect x="277" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="294" cy="228" r="2" fill="#78988f"/>
+<text x="338" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">03</text>
+<rect x="321" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M338 180v20" stroke="#b9b39f"/>
+<rect x="321" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="338" cy="228" r="2" fill="#78988f"/>
+<text x="382" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">04</text>
+<rect x="365" y="144" width="34" height="28" rx="3" fill="#c35431"/>
+<path d="M382 180v20" stroke="#b9b39f"/>
+<rect x="365" y="214" width="34" height="28" rx="3" fill="#438071" stroke="#c35431"/>
+<circle cx="382" cy="228" r="4" fill="#c35431"/>
+<text x="426" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">05</text>
+<rect x="409" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M426 180v20" stroke="#b9b39f"/>
+<rect x="409" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="426" cy="228" r="2" fill="#78988f"/>
+<text x="470" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">06</text>
+<rect x="453" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M470 180v20" stroke="#b9b39f"/>
+<rect x="453" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="470" cy="228" r="2" fill="#78988f"/>
+<text x="514" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">07</text>
+<rect x="497" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M514 180v20" stroke="#b9b39f"/>
+<rect x="497" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="514" cy="228" r="2" fill="#78988f"/>
+<text x="558" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">08</text>
+<rect x="541" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M558 180v20" stroke="#b9b39f"/>
+<rect x="541" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="558" cy="228" r="2" fill="#78988f"/>
+<text x="602" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">09</text>
+<rect x="585" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M602 180v20" stroke="#b9b39f"/>
+<rect x="585" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="602" cy="228" r="2" fill="#78988f"/>
+<text x="646" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">10</text>
+<rect x="629" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M646 180v20" stroke="#b9b39f"/>
+<rect x="629" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="646" cy="228" r="2" fill="#78988f"/>
+<text x="690" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">11</text>
+<rect x="673" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M690 180v20" stroke="#b9b39f"/>
+<rect x="673" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="690" cy="228" r="2" fill="#78988f"/>
+<text x="734" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">12</text>
+<rect x="717" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M734 180v20" stroke="#b9b39f"/>
+<rect x="717" y="214" width="34" height="28" rx="3" fill="#f5efe2" stroke="#78988f" stroke-dasharray="3 3"/>
+<circle cx="734" cy="228" r="2" fill="#78988f"/>
+<text x="778" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">13</text>
+<rect x="761" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M778 180v20" stroke="#b9b39f"/>
+<rect x="761" y="214" width="34" height="28" rx="3" fill="url(#hatch)" stroke="#78988f"/>
+<circle cx="778" cy="228" r="2" fill="#78988f"/>
+<text x="822" y="132" font-size="13" text-anchor="middle" fill="#4c5c54">14</text>
+<rect x="805" y="144" width="34" height="28" rx="3" fill="#78988f"/>
+<path d="M822 180v20" stroke="#b9b39f"/>
+<rect x="805" y="214" width="34" height="28" rx="3" fill="url(#hatch)" stroke="#78988f"/>
+<circle cx="822" cy="228" r="2" fill="#78988f"/>
+<path d="M32 278H848" stroke="#c9c1af"/>
+<text x="32" y="310" font-size="17" fill="#4c5c54">Кадр 04 · контрольная точка D-17 осталась в контексте</text>
+<text x="848" y="310" font-size="16" text-anchor="end" fill="#4c5c54">3 из 14 с содержимым</text>
+</g>
+</svg>

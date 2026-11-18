@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="332" height="164" viewBox="0 0 332 164" role="img" aria-label="01 / Разбор хода">
+  <rect x=".5" y=".5" width="331" height="163" rx="9" fill="#f4efe3" stroke="#c7c1b1"/>
+  <path d="M16 126h176M16 43h139" stroke="#c7c1b1"/>
+  <rect x="16" y="15" width="31" height="21" rx="2" fill="#a74326"/>
+  <g font-family="system-ui, DejaVu Sans, sans-serif">
+    <text x="31.5" y="30" text-anchor="middle" font-size="13" fill="#fffaf0">01</text>
+    <text x="16" y="88" font-size="23" font-weight="750" fill="#182c28">Разбор хода</text>
+    <text x="16" y="147" font-size="12" letter-spacing="1.5" fill="#a74326">КОМПАРАТОР</text>
+    <text x="302" y="147" text-anchor="end" font-size="16" fill="#a74326">↘</text>
+  </g>
+  <g stroke="#a74326" stroke-width="1.8" fill="none"><circle cx="253" cy="83" r="43"/><circle cx="253" cy="83" r="29"/><path d="M191 83h124m-62-62v124m-45-22 19-19m52-52 19-19"/></g>
+  <g stroke="#a74326" fill="#a74326"><circle cx="253" cy="83" r="8"/><path d="M280 83h36" stroke-width="4"/></g>
+</svg>

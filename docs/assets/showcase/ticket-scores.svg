@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="332" height="164" viewBox="0 0 332 164" role="img" aria-label="03 / Результаты">
+  <rect x=".5" y=".5" width="331" height="163" rx="9" fill="#f4efe3" stroke="#c7c1b1"/>
+  <path d="M16 126h176M16 43h139" stroke="#c7c1b1"/>
+  <rect x="16" y="15" width="31" height="21" rx="2" fill="#805b21"/>
+  <g font-family="system-ui, DejaVu Sans, sans-serif">
+    <text x="31.5" y="30" text-anchor="middle" font-size="13" fill="#fffaf0">03</text>
+    <text x="16" y="88" font-size="23" font-weight="750" fill="#182c28">Результаты</text>
+    <text x="16" y="147" font-size="12" letter-spacing="1.5" fill="#805b21">ПЛАСТИНА</text>
+    <text x="302" y="147" text-anchor="end" font-size="16" fill="#805b21">↘</text>
+  </g>
+  <g stroke="#805b21" stroke-width="1.8" fill="none"><path d="M202 42h105v85H202zM202 71h105m-105 28h105m-70-57v85m35-85v85"/></g>
+  <g stroke="#805b21" fill="#805b21"><path d="M205 45h29v23h-29zM240 74h29v22h-29zM275 102h29v22h-29z"/></g>
+</svg>

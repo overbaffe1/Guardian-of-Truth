@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="332" height="164" viewBox="0 0 332 164" role="img" aria-label="02 / Рентген">
+  <rect x=".5" y=".5" width="331" height="163" rx="9" fill="#f4efe3" stroke="#c7c1b1"/>
+  <path d="M16 126h176M16 43h139" stroke="#c7c1b1"/>
+  <rect x="16" y="15" width="31" height="21" rx="2" fill="#31705f"/>
+  <g font-family="system-ui, DejaVu Sans, sans-serif">
+    <text x="31.5" y="30" text-anchor="middle" font-size="13" fill="#fffaf0">02</text>
+    <text x="16" y="88" font-size="23" font-weight="750" fill="#182c28">Рентген</text>
+    <text x="16" y="147" font-size="12" letter-spacing="1.5" fill="#31705f">УПАКОВКА</text>
+    <text x="302" y="147" text-anchor="end" font-size="16" fill="#31705f">↘</text>
+  </g>
+  <g stroke="#31705f" stroke-width="1.8" fill="none"><path d="m202 61 53-24 54 24-54 24z m0 22 53 24 54-24 m-107 22 53 24 54-24 m-54-31v19"/></g>
+  <g stroke="#31705f" fill="#31705f"><path d="m202 83 53 24 54-24" fill="none" stroke-width="4"/></g>
+</svg>
